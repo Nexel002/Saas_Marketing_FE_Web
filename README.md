@@ -56,6 +56,7 @@ src/
 │   ├── page.tsx                  # Landing page
 │   └── globals.css               # Estilos globais
 ├── components/
+│   ├── Providers.tsx             # Provider global
 │   ├── ui/                       # Componentes base
 │   │   ├── Button.tsx
 │   │   ├── Card.tsx
@@ -71,7 +72,7 @@ src/
 │       ├── auth.ts               # Serviço de autenticação
 │       ├── business.ts           # Serviço de negócios
 │       └── index.ts
-└── types/                        # TypeScript types
+└── types/                        # Tipos TypeScript
 ```
 
 ## 🚀 Instalação
@@ -134,12 +135,12 @@ A aplicação estará disponível em: `http://localhost:3000`
 
 ## 🧩 Componentes
 
-### UI Components
+### Componentes de UI
 
 ```tsx
 import { Button, Card, Input } from '@/components/ui';
 
-// Button variants
+// Variantes de Botão
 <Button variant="primary">Primary</Button>
 <Button variant="secondary">Secondary</Button>
 <Button variant="outline">Outline</Button>
@@ -160,7 +161,7 @@ import { Button, Card, Input } from '@/components/ui';
 />
 ```
 
-### Layout Components
+### Componentes de Layout
 
 ```tsx
 import { Sidebar, Header } from '@/components/layout';
@@ -180,10 +181,10 @@ const { user, token } = await authService.login({
   password: '123456',
 });
 
-// Get business
+// Obter negócio
 const business = await businessService.getById('business-id');
 
-// Generic request
+// Requisição genérica
 const response = await api.get('/endpoint');
 await api.post('/endpoint', { data });
 ```
@@ -211,7 +212,7 @@ await api.post('/endpoint', { data });
 ### Gradientes
 
 ```css
-/* Hero gradient */
+/* Gradiente Hero */
 background: linear-gradient(135deg, #FBC5D8 0%, #B8D4E3 50%, #FDE68A 100%);
 ```
 
@@ -230,4 +231,4 @@ A API do PromoMo deve estar rodando em `http://localhost:8000`. Ver documentaç�
 
 ## 📄 Licença
 
-Desenvolvido por NexelIT © 2024
+Desenvolvido por NexelIT © 2026
