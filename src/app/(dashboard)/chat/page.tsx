@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
-import { Card, Button } from '@/components/ui';
+import { Card, Button, MediaCarousel, ContentGalleryModal, MediaItem } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { chatService, SSEEvent } from '@/lib/api';
 
@@ -22,6 +22,7 @@ interface Message {
     role: 'user' | 'assistant';
     content: string;
     toolCalls?: string[];
+    toolResultData?: any[];
     timestamp: Date;
 }
 
@@ -203,6 +204,15 @@ export default function ChatPage() {
 
                     case 'tool_result':
                         setCurrentTool(null);
+                        if (event.data) {
+                            setMessages(prev =>
+                                prev.map(msg =>
+                                    msg.id === assistantMessageId
+                                        ? { ...msg, toolResultData: [...(msg.toolResultData || []), event.data] }
+                                        : msg
+                                )
+                            );
+                        }
                         break;
 
                     case 'done':
@@ -384,6 +394,136 @@ export default function ChatPage() {
 function MessageBubble({ message }: { message: Message; userInitial?: string }) {
     const isUser = message.role === 'user';
     const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
+    const [galleryOpen, setGalleryOpen] = useState(false);
+
+    // Helper to convert Google Drive viewer links to direct links
+    const formatUrlForDisplay = (url: string): string => {
+        // Handle Google Drive links
+        // From: https://drive.google.com/file/d/FILE_ID/view?usp=sharing
+        // To:   https://lh3.googleusercontent.com/d/FILE_ID
+        const driveMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+        if (driveMatch && driveMatch[1]) {
+            // using lh3.googleusercontent.com/d/ is often more reliable for embeddings than drive.google.com/uc
+            return `https://lh3.googleusercontent.com/d/${driveMatch[1]}`;
+        }
+        return url;
+    };
+
+    // Extract media items from content
+    const extractMedia = (content: string, toolResults?: any[]): { cleanContent: string; mediaItems: MediaItem[] } => {
+        const mediaItems: MediaItem[] = [];
+        const seenIds = new Set<string>();
+
+        // 1. Extract from Tool Results (Source of Truth)
+        if (toolResults) {
+            toolResults.forEach(result => {
+                // Check if result has 'contents' array (from list_campaign_contents or generate_campaign_contents)
+                // The tool might return a stringified JSON, so we might need to parse it if it's a string
+                let data = result;
+                if (typeof result === 'string') {
+                    try {
+                        data = JSON.parse(result);
+                    } catch (e) {
+                        // ignore
+                    }
+                }
+
+                // Sometimes the result is nested like { result: ... } or { output: ... }
+                // Adjust based on your actual backend tool output structure.
+                // Assuming result object has 'contents' property directly or result.result check.
+
+                const contents = data.contents || (data.result && data.result.contents);
+
+                if (Array.isArray(contents)) {
+                    contents.forEach((item: any) => {
+                        if (item.driveLink || item.drive_web_link) { // drive_web_link is what backend usually returns
+                            const originalUrl = item.driveLink || item.drive_web_link;
+                            const displayUrl = formatUrlForDisplay(originalUrl);
+
+                            if (!seenIds.has(originalUrl)) {
+                                seenIds.add(originalUrl);
+                                mediaItems.push({
+                                    id: originalUrl,
+                                    type: (item.type === 'video' || item.content_type === 'video') ? 'video' : 'image',
+                                    url: displayUrl,
+                                    title: item.name || item.content_name || 'Conteúdo Gerado'
+                                });
+                            }
+                        }
+                    });
+                }
+            });
+        }
+
+        // 2. Extract from Markdown Text (Fallback & User pasted links)
+        if (!content) return { cleanContent: '', mediaItems };
+
+        const lines = content.split('\n');
+        const remainingLines: string[] = [];
+
+        lines.forEach(line => {
+            // Updated Regex to match:
+            // 1. Standard markdown images: ![alt](url)
+            // 2. Explicit links with media keywords: [Ver Imagem](url), [Ver Vídeo](url), [Imagem 1](url)
+            const mediaMatch = line.match(/(!)?\[(.*?)\]\((https?:\/\/[^\)]+)\)/i);
+
+            let isMedia = false;
+
+            if (mediaMatch) {
+                const isMarkdownImage = !!mediaMatch[1]; // The "!" prefix
+                const text = mediaMatch[2];
+                const originalUrl = mediaMatch[3];
+
+                const lowerText = text.toLowerCase();
+                const isVideo = lowerText.includes('vídeo') || lowerText.includes('video') || lowerText.includes('assistir');
+                const isImageKeyword = lowerText.includes('imagem') || lowerText.includes('image') || lowerText.includes('foto') || lowerText.includes('ver');
+
+                if (isMarkdownImage || isVideo || isImageKeyword) {
+                    // Check if we already have this URL from tool results
+                    if (!seenIds.has(originalUrl)) {
+                        isMedia = true;
+                        seenIds.add(originalUrl);
+
+                        const type = isVideo ? 'video' : 'image';
+
+                        // Clean title
+                        let title = line.replace(mediaMatch[0], '').trim();
+                        title = title.replace(/^[\*\-]\s*/, '').replace(/:\s*$/, '').trim();
+
+                        if (!title) title = (text !== 'Ver Imagem' && text !== 'Ver Vídeo') ? text : (type === 'video' ? 'Vídeo gerado' : 'Imagem gerada');
+
+                        // Format URL for display (fix Google Drive links)
+                        const displayUrl = formatUrlForDisplay(originalUrl);
+
+                        mediaItems.push({
+                            id: originalUrl,
+                            type: type as 'image' | 'video',
+                            url: displayUrl,
+                            title: title
+                        });
+                    } else {
+                        // It's a media link we already have from tool results. 
+                        // We should probably NOT show the text link to avoid duplication, 
+                        // UNLESS we want to keep the text flow. 
+                        // Let's hide it from text if it's already in carousel.
+                        isMedia = true;
+                    }
+                }
+            }
+
+            if (!isMedia) {
+                remainingLines.push(line);
+            }
+        });
+
+        // Add extra newline to ensure markdown renders correctly
+        return {
+            cleanContent: remainingLines.join('\n'),
+            mediaItems
+        };
+    };
+
+    const { cleanContent, mediaItems } = extractMedia(message.content, message.toolResultData);
 
     if (isUser) {
         return (
@@ -423,9 +563,24 @@ function MessageBubble({ message }: { message: Message; userInitial?: string }) 
                             ),
                         }}
                     >
-                        {message.content || '...'}
+                        {cleanContent || '...'}
                     </ReactMarkdown>
                 </div>
+
+                {/* Media Carousel */}
+                {mediaItems.length > 0 && (
+                    <div className="mt-4">
+                        <MediaCarousel
+                            items={mediaItems}
+                            onViewAll={() => setGalleryOpen(true)}
+                        />
+                        <ContentGalleryModal
+                            isOpen={galleryOpen}
+                            onClose={() => setGalleryOpen(false)}
+                            items={mediaItems}
+                        />
+                    </div>
+                )}
 
                 {/* Tool labels */}
                 {hasToolCalls && (

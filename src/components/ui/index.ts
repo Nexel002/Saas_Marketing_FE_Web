@@ -25,3 +25,9 @@ export type { NotificationItem } from './NotificationList';
 export { OnboardingProgress } from './OnboardingProgress';
 
 export { SmartTips } from './SmartTips';
+
+// Media components
+export { MediaCarousel } from './MediaCarousel';
+export type { MediaItem } from './MediaCarousel';
+
+export { ContentGalleryModal } from './ContentGalleryModal';
