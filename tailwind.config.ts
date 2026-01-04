@@ -49,9 +49,9 @@ const config: Config = {
                 'text-muted': '#9CA3AF',
             },
 
-            // Typography
+            // Typography - Century Gothic
             fontFamily: {
-                sans: ['Inter', 'system-ui', 'sans-serif'],
+                sans: ['Century Gothic', 'CenturyGothic', 'AppleGothic', 'Segoe UI', 'Trebuchet MS', 'sans-serif'],
             },
 
             // Gradients as background images

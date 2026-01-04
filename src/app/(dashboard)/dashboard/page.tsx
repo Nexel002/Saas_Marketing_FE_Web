@@ -3,15 +3,16 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Card } from '@/components/ui';
+import { Card, OnboardingProgress, NotificationList, SmartTips } from '@/components/ui';
+import type { NotificationItem } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { dashboardService, DashboardSummary } from '@/lib/api';
 
 /**
  * Dashboard Page
  * 
- * Main dashboard with statistics, recent activities, and quick actions.
- * Fetches real data from the API.
+ * Modern, clean dashboard inspired by Nexus design.
+ * Features: time-based greeting, onboarding progress, stats, notifications, smart tips.
  */
 export default function DashboardPage() {
     const router = useRouter();
@@ -19,6 +20,7 @@ export default function DashboardPage() {
     const [data, setData] = useState<DashboardSummary | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState('');
+    const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
     // Redirect to login if not authenticated
     useEffect(() => {
@@ -36,6 +38,8 @@ export default function DashboardPage() {
                 const response = await dashboardService.getSummary();
                 if (response.success && response.data) {
                     setData(response.data);
+                    // Generate notifications based on data
+                    setNotifications(generateNotifications(response.data));
                 }
             } catch (err: any) {
                 console.error('Error fetching dashboard:', err);
@@ -62,180 +66,125 @@ export default function DashboardPage() {
         );
     }
 
-    // Get user's first name for greeting
+    // Get greeting based on time of day
+    const greeting = getTimeBasedGreeting();
     const firstName = user?.nome?.split(' ')[0] || 'Utilizador';
 
     return (
         <div className="space-y-6 animate-fade-in">
             {/* Welcome Header */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-text-primary">
-                        Bem-vindo, {firstName}! 👋
-                    </h1>
-                    <p className="text-text-secondary mt-1">
-                        {data?.hasBusiness
-                            ? `Negócio: ${data.business?.name}`
-                            : 'Configure o seu negócio para começar'}
-                    </p>
-                </div>
-
-                <Link
-                    href="/chat"
-                    className="inline-flex items-center justify-center px-5 py-2.5 bg-primary text-white rounded-xl font-medium hover:bg-primary-600 transition-colors shadow-soft"
-                >
-                    💬 Iniciar Conversa
-                </Link>
+            <div className="flex flex-col gap-1">
+                <h1 className="text-2xl font-bold text-text-primary">
+                    {greeting}, {firstName}! 👋
+                </h1>
+                <p className="text-text-secondary">
+                    {data?.hasBusiness
+                        ? `Negócio: ${data.business?.name}`
+                        : 'Configure o seu negócio para começar'}
+                </p>
             </div>
 
             {/* Error message */}
             {error && (
-                <div className="p-4 bg-red-50 border border-error rounded-lg text-error">
+                <div className="p-4 bg-red-50 border border-error rounded-xl text-error text-sm">
                     {error}
                 </div>
             )}
 
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Onboarding Progress */}
+            <OnboardingProgress
+                hasBusiness={data?.hasBusiness || false}
+                hasMarketResearch={data?.stats?.hasMarketResearch || false}
+                hasStrategicPlan={data?.stats?.hasStrategicPlan || false}
+                hasCampaigns={(data?.stats?.totalCampaigns || 0) > 0}
+            />
+
+            {/* Stats Cards - Clean Nexus Style */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <StatCard
                     title="Campanhas"
                     value={data?.stats?.totalCampaigns?.toString() || '0'}
-                    icon={<span className="text-2xl">🎯</span>}
-                    color="bg-pink-500"
+                    subtitle={data?.stats?.totalCampaigns === 1 ? 'campanha criada' : 'campanhas criadas'}
+                    icon={
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                        </svg>
+                    }
+                    color="pink"
+                    href="/campaigns"
                 />
                 <StatCard
                     title="Pesquisa de Mercado"
-                    value={data?.stats?.hasMarketResearch ? 'Concluída' : 'Pendente'}
+                    value={data?.stats?.hasMarketResearch ? 'Activa' : 'Pendente'}
                     subtitle={data?.marketResearch?.generatedAt
                         ? `Gerada em ${formatDate(data.marketResearch.generatedAt)}`
-                        : undefined}
-                    icon={<span className="text-2xl">🔍</span>}
-                    color="bg-blue-500"
+                        : 'Não gerada ainda'}
+                    icon={
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    }
+                    color="blue"
+                    href="/research"
                 />
                 <StatCard
                     title="Plano Estratégico"
-                    value={data?.stats?.hasStrategicPlan ? 'Activo' : 'Não gerado'}
+                    value={data?.stats?.hasStrategicPlan ? 'Activo' : 'Pendente'}
                     subtitle={data?.strategicPlan?.generatedAt
                         ? `Gerado em ${formatDate(data.strategicPlan.generatedAt)}`
-                        : undefined}
-                    icon={<span className="text-2xl">📋</span>}
-                    color="bg-yellow-500"
-                />
-                <StatCard
-                    title="Conversas"
-                    value={data?.stats?.totalConversations?.toString() || '0'}
-                    icon={<span className="text-2xl">💬</span>}
-                    color="bg-purple-500"
+                        : 'Não gerado ainda'}
+                    icon={
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                        </svg>
+                    }
+                    color="yellow"
+                    href="/strategic-plan"
                 />
             </div>
 
-            {/* Content Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Recent Campaigns */}
-                <Card className="lg:col-span-2" padding="lg">
-                    <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-lg font-semibold text-text-primary">
-                            Campanhas Recentes
-                        </h2>
-                        {data?.recentCampaigns && data.recentCampaigns.length > 0 && (
-                            <Link
-                                href="/campaigns"
-                                className="text-sm font-medium text-primary hover:text-primary-600 hover:underline"
-                            >
-                                Ver todas
-                            </Link>
-                        )}
-                    </div>
-
-                    {data?.recentCampaigns && data.recentCampaigns.length > 0 ? (
-                        <div className="space-y-3">
-                            {data.recentCampaigns.map((campaign) => (
-                                <CampaignItem
-                                    key={campaign.id}
-                                    name={campaign.name}
-                                    objective={campaign.objective}
-                                    date={campaign.generatedAt}
-                                />
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="text-center py-12 px-4 rounded-2xl bg-gray-50 border-2 border-dashed border-gray-100">
-                            <span className="text-4xl block mb-3">🎯</span>
-                            <p className="text-gray-500 font-medium">Ainda não tem campanhas</p>
-                            <p className="text-sm text-gray-400 mt-1 max-w-sm mx-auto">
-                                Comece por criar uma nova campanha com a ajuda do nosso assistente de IA.
-                            </p>
-                            <Link
-                                href="/chat"
-                                className="inline-flex mt-4 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm transition-all"
-                            >
-                                Criar Campanha
-                            </Link>
-                        </div>
+            {/* Bottom Grid: Notifications + Smart Tips */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Notifications */}
+                <NotificationList
+                    notifications={notifications}
+                    onDismiss={(id) => setNotifications(prev => prev.filter(n => n.id !== id))}
+                    onMarkAsRead={(id) => setNotifications(prev =>
+                        prev.map(n => n.id === id ? { ...n, read: true } : n)
                     )}
-                </Card>
+                />
 
-                {/* Quick Actions */}
-                <Card padding="lg">
-                    <h2 className="text-lg font-semibold text-text-primary mb-6">
-                        Começar Novo
-                    </h2>
-
-                    <div className="space-y-4">
-                        <QuickActionButton
-                            href="/chat"
-                            icon="💡"
-                            label="Nova Ideia"
-                            description="Discuta novas estratégias com a IA"
-                            color="bg-purple-500"
-                        />
-                        <QuickActionButton
-                            href="/chat"
-                            icon="🎯"
-                            label="Nova Campanha"
-                            description="Crie campanhas personalizadas"
-                            color="bg-pink-500"
-                        />
-                        {!data?.stats?.hasMarketResearch && (
-                            <QuickActionButton
-                                href="/chat"
-                                icon="🔍"
-                                label="Pesquisa Mercado"
-                                description="Analise o seu mercado alvo"
-                                color="bg-blue-500"
-                            />
-                        )}
-                        {!data?.stats?.hasStrategicPlan && (
-                            <QuickActionButton
-                                href="/chat"
-                                icon="📋"
-                                label="Plano Estratégico"
-                                description="Defina a direção do seu negócio"
-                                color="bg-yellow-500"
-                            />
-                        )}
-                        {!data?.hasBusiness && (
-                            <QuickActionButton
-                                href="/business"
-                                icon="🏢"
-                                label="Configurar Negócio"
-                                description="Preencha os dados da empresa"
-                                color="bg-slate-800"
-                            />
-                        )}
-                    </div>
-                </Card>
+                {/* Smart Tips */}
+                <SmartTips
+                    hasBusiness={data?.hasBusiness || false}
+                    hasMarketResearch={data?.stats?.hasMarketResearch || false}
+                    hasStrategicPlan={data?.stats?.hasStrategicPlan || false}
+                    hasCampaigns={(data?.stats?.totalCampaigns || 0) > 0}
+                    totalCampaigns={data?.stats?.totalCampaigns || 0}
+                />
             </div>
         </div>
     );
 }
 
 // =============================================
-// Sub-components
+// Helper Functions
 // =============================================
 
-// Safe date formatting
-const formatDate = (dateStr: string) => {
+/**
+ * Get greeting based on time of day
+ */
+function getTimeBasedGreeting(): string {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) return 'Bom dia';
+    if (hour >= 12 && hour < 18) return 'Boa tarde';
+    return 'Boa noite';
+}
+
+/**
+ * Safe date formatting
+ */
+function formatDate(dateStr: string): string {
     try {
         const date = new Date(dateStr);
         if (isNaN(date.getTime())) return 'Data desconhecida';
@@ -243,114 +192,102 @@ const formatDate = (dateStr: string) => {
     } catch {
         return 'Data desconhecida';
     }
-};
+}
+
+/**
+ * Generate notifications based on dashboard data
+ */
+function generateNotifications(data: DashboardSummary): NotificationItem[] {
+    const notifications: NotificationItem[] = [];
+    const now = new Date();
+
+    // Check if market research is old (30+ days)
+    if (data.marketResearch?.generatedAt) {
+        const researchDate = new Date(data.marketResearch.generatedAt);
+        const daysDiff = Math.floor((now.getTime() - researchDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysDiff >= 30) {
+            notifications.push({
+                id: 'research-old',
+                title: 'Pesquisa de mercado desatualizada',
+                message: `Sua pesquisa tem ${daysDiff} dias. Considere gerar uma nova análise.`,
+                type: 'warning',
+                timestamp: now.toISOString(),
+            });
+        }
+    }
+
+    // Welcome notification for new users
+    if (!data.hasBusiness) {
+        notifications.push({
+            id: 'welcome',
+            title: 'Bem-vindo ao PromoMo! 🎉',
+            message: 'Configure seu negócio para começar a usar a plataforma.',
+            type: 'info',
+            timestamp: now.toISOString(),
+        });
+    }
+
+    // Campaign created recently
+    if (data.recentCampaigns && data.recentCampaigns.length > 0) {
+        const lastCampaign = data.recentCampaigns[0];
+        const campaignDate = new Date(lastCampaign.generatedAt);
+        const hoursDiff = Math.floor((now.getTime() - campaignDate.getTime()) / (1000 * 60 * 60));
+        if (hoursDiff < 24) {
+            notifications.push({
+                id: 'campaign-created',
+                title: 'Campanha criada com sucesso!',
+                message: `"${lastCampaign.name}" está pronta para uso.`,
+                type: 'success',
+                timestamp: lastCampaign.generatedAt,
+            });
+        }
+    }
+
+    return notifications;
+}
+
+// =============================================
+// Sub-components
+// =============================================
 
 interface StatCardProps {
     title: string;
     value: string;
-    subtitle?: string;
+    subtitle: string;
     icon: React.ReactNode;
-    color: string;
+    color: 'pink' | 'blue' | 'yellow' | 'purple';
+    href?: string;
 }
 
-function StatCard({ title, value, subtitle, icon, color }: StatCardProps) {
-    return (
-        <Card className="relative overflow-hidden group" padding="md">
-            <div className={`absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity ${color}`}>
-                {icon}
-            </div>
-            <div className="relative z-10">
-                <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
-                <div className="flex items-baseline gap-2">
-                    <h3 className="text-2xl font-bold text-gray-900">{value}</h3>
+function StatCard({ title, value, subtitle, icon, color, href }: StatCardProps) {
+    const colorStyles = {
+        pink: 'bg-pink-50 text-pink-600',
+        blue: 'bg-blue-50 text-blue-600',
+        yellow: 'bg-amber-50 text-amber-600',
+        purple: 'bg-purple-50 text-purple-600',
+    };
+
+    const content = (
+        <Card
+            className={`relative overflow-hidden transition-all duration-200 ${href ? 'hover:shadow-md hover:border-gray-200 cursor-pointer' : ''}`}
+            padding="lg"
+        >
+            <div className="flex items-start justify-between">
+                <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
+                    <h3 className="text-2xl font-bold text-gray-900 mb-1">{value}</h3>
+                    <p className="text-xs text-gray-400">{subtitle}</p>
                 </div>
-                {subtitle && (
-                    <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        {subtitle}
-                    </p>
-                )}
+                <div className={`p-3 rounded-xl ${colorStyles[color]}`}>
+                    {icon}
+                </div>
             </div>
         </Card>
     );
-}
 
-interface CampaignItemProps {
-    name: string;
-    objective: string;
-    date: string;
-}
+    if (href) {
+        return <Link href={href}>{content}</Link>;
+    }
 
-function CampaignItem({ name, objective, date }: CampaignItemProps) {
-    const objectiveLabels: Record<string, string> = {
-        BRAND_AWARENESS: 'Reconhecimento de Marca',
-        LEAD_GENERATION: 'Geração de Leads',
-        SALES: 'Vendas',
-        ENGAGEMENT: 'Engajamento',
-        TRAFFIC: 'Tráfego',
-    };
-
-    const objectiveColors: Record<string, string> = {
-        BRAND_AWARENESS: 'bg-purple-100 text-purple-700',
-        LEAD_GENERATION: 'bg-blue-100 text-blue-700',
-        SALES: 'bg-green-100 text-green-700',
-        ENGAGEMENT: 'bg-pink-100 text-pink-700',
-        TRAFFIC: 'bg-orange-100 text-orange-700',
-    };
-
-    return (
-        <div className="flex items-center gap-4 p-4 rounded-xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100">
-            <div className={`p-3 rounded-lg ${objectiveColors[objective] || 'bg-gray-100 text-gray-600'}`}>
-                <span className="text-xl">🎯</span>
-            </div>
-            <div className="flex-1 min-w-0">
-                <h4 className="text-sm font-semibold text-gray-900 truncate mb-1">{name}</h4>
-                <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <span className="px-2 py-0.5 bg-gray-100 rounded-full">
-                        {objectiveLabels[objective] || objective}
-                    </span>
-                    <span>•</span>
-                    <span>{formatDate(date)}</span>
-                </div>
-            </div>
-            <div className="text-gray-400">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-            </div>
-        </div>
-    );
-}
-
-interface QuickActionButtonProps {
-    href: string;
-    icon: string;
-    label: string;
-    description?: string;
-    color?: string;
-}
-
-function QuickActionButton({ href, icon, label, description, color = "bg-primary" }: QuickActionButtonProps) {
-    return (
-        <Link
-            href={href}
-            className="flex items-start gap-4 p-4 rounded-xl border border-gray-100 hover:border-gray-200 hover:shadow-sm hover:bg-gray-50 transition-all group"
-        >
-            <div className={`p-3 rounded-xl text-white ${color} shadow-sm group-hover:scale-110 transition-transform`}>
-                <span className="text-xl">{icon}</span>
-            </div>
-            <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-1 group-hover:text-primary transition-colors">
-                    {label}
-                </h4>
-                {description && (
-                    <p className="text-xs text-text-secondary leading-relaxed">
-                        {description}
-                    </p>
-                )}
-            </div>
-        </Link>
-    );
+    return content;
 }
