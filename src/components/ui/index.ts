@@ -17,3 +17,11 @@ export type { CardProps, CardHeaderProps, CardContentProps, CardFooterProps } fr
 
 export { Input } from './Input';
 export type { InputProps } from './Input';
+
+// Dashboard components
+export { NotificationList } from './NotificationList';
+export type { NotificationItem } from './NotificationList';
+
+export { OnboardingProgress } from './OnboardingProgress';
+
+export { SmartTips } from './SmartTips';

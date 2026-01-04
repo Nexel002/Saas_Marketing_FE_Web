@@ -7,8 +7,7 @@
    Light theme with pastel gradients
    ============================================= */
 
-/* Import Inter font from Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+/* Century Gothic font - system font with fallbacks */
 
 :root {
   /* Background colors */
@@ -37,6 +36,9 @@
   /* Border and divider */
   --border: #E5E7EB;
   --divider: #F3F4F6;
+  
+  /* Font family */
+  --font-family: 'Century Gothic', 'CenturyGothic', 'AppleGothic', 'Segoe UI', 'Trebuchet MS', sans-serif;
 }
 
 /* Base styles */
@@ -45,7 +47,7 @@ html {
 }
 
 body {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: var(--font-family);
   background-color: var(--background);
   color: var(--text-primary);
   line-height: 1.6;
