@@ -61,6 +61,11 @@ const navItems: NavItem[] = [
         icon: <CampaignIcon />,
     },
     {
+        name: 'Conteúdos',
+        href: '/contents',
+        icon: <ContentIcon />,
+    },
+    {
         name: 'Negócio',
         href: '/business',
         icon: <BusinessIcon />,
@@ -285,7 +290,7 @@ export function Sidebar({ isOpen = true, onClose, isCollapsed = false, onToggleC
                         )}
                     </div>
 
-                    {/* Footer - User + Settings */}
+                    {/* Footer - User + Settings + Logout */}
                     <div className={`border-t border-gray-200 p-3 ${isCollapsed ? 'px-2' : ''}`}>
                         <div className={`flex items-center ${isCollapsed ? 'flex-col gap-2' : 'justify-between'}`}>
                             {/* User */}
@@ -300,14 +305,26 @@ export function Sidebar({ isOpen = true, onClose, isCollapsed = false, onToggleC
                                 )}
                             </div>
 
-                            {/* Settings icon */}
-                            <Link
-                                href="/settings"
-                                className={`p-2 rounded-lg hover:bg-gray-100 transition-colors ${isCollapsed ? '' : ''}`}
-                                title="Configurações"
-                            >
-                                <SettingsIcon className="w-5 h-5 text-gray-500" />
-                            </Link>
+                            {/* Action buttons */}
+                            <div className={`flex items-center ${isCollapsed ? 'flex-col gap-1' : 'gap-1'}`}>
+                                {/* Settings icon */}
+                                <Link
+                                    href="/settings"
+                                    className="p-2 rounded-lg hover:bg-gray-100 transition-colors group"
+                                    title="Configurações"
+                                >
+                                    <SettingsIcon className="w-5 h-5 text-gray-500 group-hover:text-gray-700 transition-colors" />
+                                </Link>
+
+                                {/* Logout button */}
+                                <button
+                                    onClick={handleLogout}
+                                    className="p-2 rounded-lg hover:bg-red-50 transition-colors group"
+                                    title="Sair"
+                                >
+                                    <LogoutIcon className="w-5 h-5 text-gray-500 group-hover:text-red-600 transition-colors" />
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -438,6 +455,14 @@ function CampaignIcon() {
     );
 }
 
+function ContentIcon() {
+    return (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+    );
+}
+
 function BusinessIcon() {
     return (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -483,6 +508,14 @@ function HistoryIcon({ className }: { className?: string }) {
     return (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        </svg>
+    );
+}
+
+function LogoutIcon({ className }: { className?: string }) {
+    return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
         </svg>
     );
 }

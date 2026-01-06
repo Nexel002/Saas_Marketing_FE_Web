@@ -35,3 +35,8 @@ export type { MarketResearch } from './research';
 // Strategic Plan
 export { strategicPlanService } from './strategic';
 export type { StrategicPlan, GenerateStrategicPlanData } from './strategic';
+
+// Content
+export { contentService } from './content';
+export type { ContentItem, ContentType, ContentStatus, MediaContentItem } from './content';
+

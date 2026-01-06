@@ -13,30 +13,30 @@
   /* Background colors */
   --background: #FFFFFF;
   --surface: #F8FAFC;
-  
+
   /* Primary color */
   --primary: #6366F1;
   --primary-hover: #4F51E5;
-  
+
   /* Accent colors */
   --accent-pink: #FBC5D8;
   --accent-blue: #B8D4E3;
   --accent-yellow: #FDE68A;
-  
+
   /* Text colors */
   --text-primary: #1F2937;
   --text-secondary: #6B7280;
   --text-muted: #9CA3AF;
-  
+
   /* Semantic colors */
   --success: #10B981;
   --warning: #F59E0B;
   --error: #EF4444;
-  
+
   /* Border and divider */
   --border: #E5E7EB;
   --divider: #F3F4F6;
-  
+
   /* Font family */
   --font-family: 'Century Gothic', 'CenturyGothic', 'AppleGothic', 'Segoe UI', 'Trebuchet MS', sans-serif;
 }
@@ -119,16 +119,22 @@ body {
 }
 
 @keyframes fadeIn {
-  0% { opacity: 0; }
-  100% { opacity: 1; }
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
 }
 
 @keyframes slideUp {
-  0% { 
+  0% {
     opacity: 0;
     transform: translateY(10px);
   }
-  100% { 
+
+  100% {
     opacity: 1;
     transform: translateY(0);
   }
@@ -145,5 +151,49 @@ body {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* =============================================
+ * Content Cards Animations
+ * ============================================= */
+
+/* Fade-in animation for content cards */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Apply animation when card becomes visible */
+.content-card.visible {
+  animation: fadeInUp 0.6s ease-out forwards;
+}
+
+/* Smooth hover transitions */
+.content-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Gallery card styling for masonry */
+.gallery-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.gallery-card.visible {
+  animation: fadeInUp 0.5s ease-out forwards;
 }
