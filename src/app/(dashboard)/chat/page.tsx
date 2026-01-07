@@ -6,6 +6,8 @@ import ReactMarkdown from 'react-markdown';
 import { Card, Button, MediaCarousel, ContentGalleryModal, MediaItem } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { chatService, SSEEvent } from '@/lib/api';
+import { DocumentPanel } from '@/components/chat/DocumentPanel';
+import { DocumentPanelState, Document } from '@/types/document';
 
 /**
  * Chat Page - Clean interface without secondary sidebar
@@ -74,6 +76,10 @@ export default function ChatPage() {
     const [conversationId, setConversationId] = useState<string | null>(null);
     const [currentTool, setCurrentTool] = useState<string | null>(null);
     const [isLoadingConversation, setIsLoadingConversation] = useState(false);
+    const [documentPanel, setDocumentPanel] = useState<DocumentPanelState>({
+        isOpen: false,
+        document: undefined
+    });
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -215,6 +221,25 @@ export default function ChatPage() {
                         }
                         break;
 
+                    case 'document':
+                        // Document generated - open panel automatically
+                        if (event.data) {
+                            const doc: Document = {
+                                id: event.data.documentId || Date.now().toString(),
+                                type: event.data.type,
+                                title: event.data.title,
+                                content: event.data.content,
+                                driveLink: event.data.driveLink,
+                                pdfFileName: event.data.pdfFileName,
+                                createdAt: new Date()
+                            };
+                            setDocumentPanel({
+                                isOpen: true,
+                                document: doc
+                            });
+                        }
+                        break;
+
                     case 'done':
                         if (event.data.toolsUsed) {
                             setMessages(prev =>
@@ -275,117 +300,189 @@ export default function ChatPage() {
     const firstName = user?.nome?.split(' ')[0] || 'Utilizador';
 
     return (
-        <div className="flex flex-col -mx-4 lg:-mx-6 -mt-4 lg:-mt-6 -mb-4 lg:-mb-6 h-[calc(100vh-4rem)] bg-white">
-            {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto">
-                {isLoadingConversation ? (
-                    <div className="h-full flex items-center justify-center">
-                        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                    </div>
-                ) : !hasMessages ? (
-                    // Welcome screen
-                    <div className="h-full flex flex-col items-center justify-center px-4">
-                        <div className="text-center mb-10">
-                            <h1 className="text-2xl font-semibold text-gray-800 mb-2">
-                                Olá, {firstName}!
-                            </h1>
-                            <p className="text-gray-500">
-                                Como posso ajudar o teu negócio hoje?
-                            </p>
+        <div className="flex h-[calc(100vh-4rem)] bg-white -mx-4 lg:-mx-6 -mt-4 lg:-mt-6 -mb-4 lg:-mb-6">
+            {/* Main Chat Area */}
+            <div className={`flex flex-col transition-all duration-300 ${documentPanel.isOpen ? 'lg:w-1/2' : 'w-full'}`}>
+                {/* Messages Area */}
+                <div className="flex-1 overflow-y-auto">
+                    {isLoadingConversation ? (
+                        <div className="h-full flex items-center justify-center">
+                            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                         </div>
+                    ) : !hasMessages ? (
+                        // Welcome screen
+                        <div className="h-full flex flex-col items-center justify-center px-4">
+                            <div className="text-center mb-10">
+                                <h1 className="text-2xl font-semibold text-gray-800 mb-2">
+                                    Olá, {firstName}!
+                                </h1>
+                                <p className="text-gray-500">
+                                    Como posso ajudar o teu negócio hoje?
+                                </p>
+                            </div>
 
-                        {/* Suggestions Grid */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl w-full px-4">
-                            {suggestions.map((suggestion, index) => (
-                                <button
-                                    key={index}
-                                    onClick={() => handleSend(suggestion.prompt)}
-                                    className="flex items-start gap-3 p-4 text-left bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl transition-colors"
-                                >
-                                    <span className="text-xl">{suggestion.icon}</span>
-                                    <span className="text-sm text-gray-700">{suggestion.label}</span>
-                                </button>
+                            {/* Suggestions Grid */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl w-full px-4">
+                                {suggestions.map((suggestion, index) => (
+                                    <button
+                                        key={index}
+                                        onClick={() => handleSend(suggestion.prompt)}
+                                        className="flex items-start gap-3 p-4 text-left bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl transition-colors"
+                                    >
+                                        <span className="text-xl">{suggestion.icon}</span>
+                                        <span className="text-sm text-gray-700">{suggestion.label}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    ) : (
+                        // Messages
+                        <div className="max-w-3xl mx-auto py-6 px-4">
+                            {messages.map((message) => (
+                                <MessageBubble
+                                    key={message.id}
+                                    message={message}
+                                    userInitial={firstName.charAt(0).toUpperCase()}
+                                />
                             ))}
+
+                            {/* Tool indicator - User-friendly */}
+                            {currentTool && (
+                                <div className="flex items-center gap-3 py-4">
+                                    <div className="flex gap-1">
+                                        <span className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
+                                        <span className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '200ms' }} />
+                                        <span className="w-2 h-2 bg-primary rounded-full animate-pulse" style={{ animationDelay: '400ms' }} />
+                                    </div>
+                                    <span className="text-sm text-gray-600 font-medium">
+                                        A fazer: {getToolFriendlyName(currentTool)}
+                                    </span>
+                                </div>
+                            )}
+
+                            {/* Loading dots */}
+                            {isLoading && !currentTool && messages[messages.length - 1]?.content === '' && (
+                                <div className="flex items-start gap-4 py-4">
+                                    <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+                                        P
+                                    </div>
+                                    <div className="flex gap-1 pt-3">
+                                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                        <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                    </div>
+                                </div>
+                            )}
+
+                            <div ref={messagesEndRef} />
                         </div>
-                    </div>
-                ) : (
-                    // Messages
-                    <div className="max-w-3xl mx-auto py-6 px-4">
-                        {messages.map((message) => (
-                            <MessageBubble
-                                key={message.id}
-                                message={message}
-                                userInitial={firstName.charAt(0).toUpperCase()}
+                    )}
+                </div>
+
+                {/* Input Area */}
+                <div className="p-4 pb-6">
+                    <div className="max-w-3xl mx-auto">
+                        <div className="relative flex items-end bg-gray-100 rounded-2xl border border-gray-200 focus-within:border-gray-300 transition-colors">
+                            {/* Textarea */}
+                            <textarea
+                                ref={inputRef}
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                placeholder="Pergunte ao assistente..."
+                                rows={1}
+                                className="flex-1 py-3 px-4 bg-transparent resize-none focus:outline-none text-gray-800 placeholder:text-gray-400 max-h-[200px]"
+                                disabled={isLoading}
                             />
-                        ))}
 
-                        {/* Tool indicator */}
-                        {currentTool && (
-                            <div className="flex items-center gap-2 py-4 text-sm text-primary">
-                                <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                                <span>A usar: {currentTool}</span>
-                            </div>
-                        )}
-
-                        {/* Loading dots */}
-                        {isLoading && !currentTool && messages[messages.length - 1]?.content === '' && (
-                            <div className="flex items-start gap-4 py-4">
-                                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
-                                    P
-                                </div>
-                                <div className="flex gap-1 pt-3">
-                                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                                </div>
-                            </div>
-                        )}
-
-                        <div ref={messagesEndRef} />
-                    </div>
-                )}
-            </div>
-
-            {/* Input Area */}
-            <div className="p-4 pb-6">
-                <div className="max-w-3xl mx-auto">
-                    <div className="relative flex items-end bg-gray-100 rounded-2xl border border-gray-200 focus-within:border-gray-300 transition-colors">
-                        {/* Textarea */}
-                        <textarea
-                            ref={inputRef}
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            placeholder="Pergunte ao assistente..."
-                            rows={1}
-                            className="flex-1 py-3 px-4 bg-transparent resize-none focus:outline-none text-gray-800 placeholder:text-gray-400 max-h-[200px]"
-                            disabled={isLoading}
-                        />
-
-                        {/* Send button */}
-                        <button
-                            onClick={() => handleSend()}
-                            disabled={!input.trim() || isLoading}
-                            className={`
+                            {/* Send button */}
+                            <button
+                                onClick={() => handleSend()}
+                                disabled={!input.trim() || isLoading}
+                                className={`
                                 m-2 p-2 rounded-full transition-colors
                                 ${input.trim() && !isLoading
-                                    ? 'bg-primary text-white hover:bg-primary/90'
-                                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                }
+                                        ? 'bg-primary text-white hover:bg-primary/90'
+                                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                    }
                             `}
-                        >
-                            <ArrowUpIcon className="w-4 h-4" />
-                        </button>
-                    </div>
+                            >
+                                <ArrowUpIcon className="w-4 h-4" />
+                            </button>
+                        </div>
 
-                    <p className="text-xs text-gray-400 text-center mt-2">
-                        PromoMo usa IA para gerar respostas. Verifique informações importantes.
-                    </p>
+                        <p className="text-xs text-gray-400 text-center mt-2">
+                            PromoMo usa IA para gerar respostas. Verifique informações importantes.
+                        </p>
+                    </div>
                 </div>
             </div>
+
+            {/* Document Panel */}
+            <DocumentPanel
+                isOpen={documentPanel.isOpen}
+                document={documentPanel.document}
+                onClose={() => setDocumentPanel({ isOpen: false, document: undefined })}
+            />
         </div>
     );
 }
+
+// =============================================
+// Helper Functions
+// =============================================
+
+/**
+ * Convert technical tool names to user-friendly action descriptions
+ */
+const getToolFriendlyName = (toolName: string): string => {
+    const toolMap: Record<string, string> = {
+        'describe_business': 'a registar o seu negócio',
+        'get_business_info': 'a obter informações do negócio',
+        'update_business': 'a atualizar o negócio',
+        'run_market_research': 'a fazer pesquisa de mercado',
+        'get_market_research': 'a obter pesquisa de mercado',
+        'run_strategic_plan': 'a criar plano estratégico',
+        'get_strategic_plan': 'a obter plano estratégico',
+        'generate_campaign': 'a criar campanha de marketing',
+        'list_campaigns': 'a listar campanhas',
+        'get_campaign': 'a obter detalhes da campanha',
+        'generate_content': 'a gerar conteúdo',
+        'generate_campaign_contents': 'a gerar conteúdos da campanha',
+        'generate_campaign_images': 'a gerar imagens da campanha',
+        'generate_campaign_videos': 'a gerar vídeos da campanha',
+        'list_campaign_contents': 'a listar conteúdos da campanha',
+        'list_all_business_content': 'a listar todos os conteúdos',
+        'list_generated_content': 'a listar conteúdos gerados',
+        'get_drive_links': 'a obter links do Google Drive',
+    };
+
+    return toolMap[toolName] || `a executar ${toolName.replace(/_/g, ' ')}`;
+};
+
+/**
+ * Remove MongoDB ObjectIds and other technical IDs from text
+ */
+const sanitizeContent = (content: string): string => {
+    if (!content) return content;
+
+    // Remove MongoDB ObjectId patterns: (ID: 507f1f77bcf86cd799439011)
+    let sanitized = content.replace(/\(ID:\s*[a-f0-9]{24}\s*\)/gi, '');
+
+    // Remove standalone ObjectIds in parentheses
+    sanitized = sanitized.replace(/\([a-f0-9]{24}\)/g, '');
+
+    // Remove "ID: xxx" patterns
+    sanitized = sanitized.replace(/ID:\s*[a-f0-9]{24}/gi, '');
+
+    // Clean up any double spaces left behind
+    sanitized = sanitized.replace(/\s{2,}/g, ' ');
+
+    // Clean up spaces before punctuation
+    sanitized = sanitized.replace(/\s+([.,;:!?])/g, '$1');
+
+    return sanitized.trim();
+};
 
 // =============================================
 // Sub-components
@@ -525,6 +622,9 @@ function MessageBubble({ message }: { message: Message; userInitial?: string }) 
 
     const { cleanContent, mediaItems } = extractMedia(message.content, message.toolResultData);
 
+    // Sanitize content to remove technical IDs
+    const sanitizedContent = sanitizeContent(cleanContent);
+
     if (isUser) {
         return (
             <div className="flex justify-end mb-6">
@@ -539,31 +639,36 @@ function MessageBubble({ message }: { message: Message; userInitial?: string }) 
         <div className="flex justify-start mb-6 w-full">
             <div className="max-w-[90%] sm:max-w-[85%] space-y-2">
                 {/* Message Content */}
-                <div className="text-gray-800 leading-relaxed prose prose-sm max-w-none prose-p:my-2 prose-a:text-primary prose-strong:font-semibold">
+                <div className="text-gray-800 leading-relaxed prose prose-sm max-w-none">
                     <ReactMarkdown
                         components={{
-                            p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
-                            strong: ({ children }) => <strong className="font-semibold text-gray-900">{children}</strong>,
-                            ul: ({ children }) => <ul className="list-disc list-outside ml-4 my-2 space-y-1">{children}</ul>,
-                            ol: ({ children }) => <ol className="list-decimal list-outside ml-4 my-2 space-y-1">{children}</ol>,
-                            li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                            p: ({ children }) => <p className="mb-3 last:mb-0 leading-7 text-[15px]">{children}</p>,
+                            strong: ({ children }) => <strong className="font-bold text-gray-900">{children}</strong>,
+                            em: ({ children }) => <em className="font-medium text-gray-700">{children}</em>,
+                            ul: ({ children }) => <ul className="list-disc list-outside ml-5 my-3 space-y-2">{children}</ul>,
+                            ol: ({ children }) => <ol className="list-decimal list-outside ml-5 my-3 space-y-2">{children}</ol>,
+                            li: ({ children }) => <li className="leading-7 pl-1">{children}</li>,
+                            h1: ({ children }) => <h1 className="text-xl font-bold text-gray-900 mt-4 mb-3">{children}</h1>,
+                            h2: ({ children }) => <h2 className="text-lg font-bold text-gray-900 mt-4 mb-2">{children}</h2>,
+                            h3: ({ children }) => <h3 className="text-base font-bold text-gray-900 mt-3 mb-2">{children}</h3>,
                             a: ({ href, children }) => (
                                 <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">
                                     {children}
                                 </a>
                             ),
                             code: ({ children }) => (
-                                <code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-gray-800">{children}</code>
+                                <code className="bg-gray-100 px-2 py-0.5 rounded text-sm font-mono text-gray-800">{children}</code>
                             ),
                             pre: ({ children }) => (
-                                <pre className="bg-gray-100 p-3 rounded-lg overflow-x-auto text-sm my-2">{children}</pre>
+                                <pre className="bg-gray-100 p-4 rounded-lg overflow-x-auto text-sm my-3">{children}</pre>
                             ),
                             blockquote: ({ children }) => (
-                                <blockquote className="border-l-4 border-gray-200 pl-4 py-1 italic text-gray-600 my-2">{children}</blockquote>
+                                <blockquote className="border-l-4 border-primary/30 pl-4 py-2 italic text-gray-600 my-3 bg-gray-50/50 rounded-r">{children}</blockquote>
                             ),
+                            hr: () => <hr className="my-4 border-gray-200" />,
                         }}
                     >
-                        {cleanContent || '...'}
+                        {sanitizedContent || '...'}
                     </ReactMarkdown>
                 </div>
 
@@ -582,17 +687,7 @@ function MessageBubble({ message }: { message: Message; userInitial?: string }) 
                     </div>
                 )}
 
-                {/* Tool labels */}
-                {hasToolCalls && (
-                    <div className="flex flex-wrap gap-2 pt-1">
-                        {message.toolCalls?.map((tool, i) => (
-                            <div key={i} className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-medium border border-blue-100">
-                                <span>⚡</span>
-                                <span>{tool}</span>
-                            </div>
-                        ))}
-                    </div>
-                )}
+                {/* Tool labels - REMOVED to keep chat clean and user-friendly */}
             </div>
         </div>
     );

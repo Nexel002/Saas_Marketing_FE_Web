@@ -40,3 +40,7 @@ export type { StrategicPlan, GenerateStrategicPlanData } from './strategic';
 export { contentService } from './content';
 export type { ContentItem, ContentType, ContentStatus, MediaContentItem } from './content';
 
+// Documents
+export { documentsService } from './documents';
+export type { Document, DocumentType } from '@/types/document';
+
