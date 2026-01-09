@@ -36,7 +36,7 @@ export const researchService = {
      * Note: Backend extracts userId from JWT token
      */
     async list(): Promise<ApiResponse<MarketResearch[]>> {
-        return api.get<MarketResearch[]>('/v1/research');
+        return api.get<MarketResearch[]>('/research');
     },
 
     /**
@@ -44,7 +44,7 @@ export const researchService = {
      * GET /api/v1/research/:id
      */
     async getById(researchId: string): Promise<ApiResponse<MarketResearch>> {
-        return api.get<MarketResearch>(`/v1/research/${researchId}`);
+        return api.get<MarketResearch>(`/research/${researchId}`);
     },
 
     /**
@@ -53,7 +53,7 @@ export const researchService = {
      * Note: Backend extracts userId from JWT token
      */
     async generate(): Promise<ApiResponse<MarketResearch>> {
-        return api.post<MarketResearch>('/v1/research/business', {});
+        return api.post<MarketResearch>('/research/business', {});
     },
 
     /**
@@ -61,7 +61,7 @@ export const researchService = {
      * DELETE /api/v1/research/:id
      */
     async delete(researchId: string): Promise<ApiResponse<void>> {
-        return api.delete<void>(`/v1/research/${researchId}`);
+        return api.delete<void>(`/research/${researchId}`);
     },
 };
 

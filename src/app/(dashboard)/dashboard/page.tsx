@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Card, OnboardingProgress, NotificationList, SmartTips } from '@/components/ui';
+import { Card, OnboardingProgress, NotificationList } from '@/components/ui';
 import type { NotificationItem } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { dashboardService, DashboardSummary } from '@/lib/api';
@@ -146,22 +146,15 @@ export default function DashboardPage() {
             {/* Bottom Grid: Notifications + Smart Tips */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Notifications */}
-                <NotificationList
-                    notifications={notifications}
-                    onDismiss={(id) => setNotifications(prev => prev.filter(n => n.id !== id))}
-                    onMarkAsRead={(id) => setNotifications(prev =>
-                        prev.map(n => n.id === id ? { ...n, read: true } : n)
-                    )}
-                />
-
-                {/* Smart Tips */}
-                <SmartTips
-                    hasBusiness={data?.hasBusiness || false}
-                    hasMarketResearch={data?.stats?.hasMarketResearch || false}
-                    hasStrategicPlan={data?.stats?.hasStrategicPlan || false}
-                    hasCampaigns={(data?.stats?.totalCampaigns || 0) > 0}
-                    totalCampaigns={data?.stats?.totalCampaigns || 0}
-                />
+                <div className="lg:col-span-2">
+                    <NotificationList
+                        notifications={notifications}
+                        onDismiss={(id) => setNotifications(prev => prev.filter(n => n.id !== id))}
+                        onMarkAsRead={(id) => setNotifications(prev =>
+                            prev.map(n => n.id === id ? { ...n, read: true } : n)
+                        )}
+                    />
+                </div>
             </div>
         </div>
     );

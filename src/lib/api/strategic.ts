@@ -53,7 +53,7 @@ export const strategicPlanService = {
      * Note: Backend extracts userId from JWT token
      */
     async list(): Promise<ApiResponse<StrategicPlan[]>> {
-        return api.get<StrategicPlan[]>('/v1/strategic-plan');
+        return api.get<StrategicPlan[]>('/strategic-plan');
     },
 
     /**
@@ -61,7 +61,7 @@ export const strategicPlanService = {
      * GET /api/v1/strategic-plan/:id
      */
     async getById(planId: string): Promise<ApiResponse<StrategicPlan>> {
-        return api.get<StrategicPlan>(`/v1/strategic-plan/${planId}`);
+        return api.get<StrategicPlan>(`/strategic-plan/${planId}`);
     },
 
     /**
@@ -70,7 +70,7 @@ export const strategicPlanService = {
      * Note: Backend extracts userId from JWT token
      */
     async generate(data?: GenerateStrategicPlanData): Promise<ApiResponse<StrategicPlan>> {
-        return api.post<StrategicPlan>('/v1/strategic-plan/generate', data || {});
+        return api.post<StrategicPlan>('/strategic-plan/generate', data || {});
     },
 
     /**
@@ -78,7 +78,7 @@ export const strategicPlanService = {
      * DELETE /api/v1/strategic-plan/:id
      */
     async delete(planId: string): Promise<ApiResponse<void>> {
-        return api.delete<void>(`/v1/strategic-plan/${planId}`);
+        return api.delete<void>(`/strategic-plan/${planId}`);
     },
 };
 

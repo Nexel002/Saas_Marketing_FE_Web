@@ -4,7 +4,7 @@
  * Type definitions for document viewer feature
  */
 
-export type DocumentType = 'market_research' | 'strategic_plan' | 'campaign';
+export type DocumentType = 'market_research' | 'strategic_plan' | 'campaign' | 'pdf_document';
 
 export interface Document {
     id: string;

@@ -69,7 +69,7 @@ export const campaignService = {
      * Note: Backend extracts userId from JWT token
      */
     async list(objective?: CampaignObjective): Promise<ApiResponse<Campaign[]>> {
-        let url = '/v1/campaign';
+        let url = '/campaign';
         if (objective) url += `?objective=${objective}`;
         return api.get<Campaign[]>(url);
     },
@@ -79,7 +79,7 @@ export const campaignService = {
      * GET /api/v1/campaign/:id
      */
     async getById(campaignId: string): Promise<ApiResponse<Campaign>> {
-        return api.get<Campaign>(`/v1/campaign/${campaignId}`);
+        return api.get<Campaign>(`/campaign/${campaignId}`);
     },
 
     /**
@@ -88,7 +88,7 @@ export const campaignService = {
      * Note: Backend extracts userId from JWT token
      */
     async generate(data: GenerateCampaignData): Promise<ApiResponse<Campaign>> {
-        return api.post<Campaign>('/v1/campaign/generate', data);
+        return api.post<Campaign>('/campaign/generate', data);
     },
 
     /**
@@ -96,7 +96,7 @@ export const campaignService = {
      * DELETE /api/v1/campaign/:id
      */
     async delete(campaignId: string): Promise<ApiResponse<void>> {
-        return api.delete<void>(`/v1/campaign/${campaignId}`);
+        return api.delete<void>(`/campaign/${campaignId}`);
     },
 
     /**
@@ -104,7 +104,7 @@ export const campaignService = {
      * GET /api/v1/campaign/objectives
      */
     async getObjectives(): Promise<ApiResponse<CampaignObjectiveInfo[]>> {
-        return api.get<CampaignObjectiveInfo[]>('/v1/campaign/objectives');
+        return api.get<CampaignObjectiveInfo[]>('/campaign/objectives');
     },
 
     /**
@@ -112,7 +112,7 @@ export const campaignService = {
      * POST /api/v1/campaign/:id/generate-contents
      */
     async generateContents(campaignId: string): Promise<ApiResponse<any>> {
-        return api.post<any>(`/v1/campaign/${campaignId}/generate-contents`, {});
+        return api.post<any>(`/campaign/${campaignId}/generate-contents`, {});
     },
 };
 

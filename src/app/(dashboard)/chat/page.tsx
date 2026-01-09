@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { chatService, SSEEvent } from '@/lib/api';
 import { DocumentPanel } from '@/components/chat/DocumentPanel';
 import { DocumentPanelState, Document } from '@/types/document';
+import { useVoiceRecognition } from '@/hooks/useVoiceRecognition';
 
 /**
  * Chat Page - Clean interface without secondary sidebar
@@ -25,6 +26,7 @@ interface Message {
     content: string;
     toolCalls?: string[];
     toolResultData?: any[];
+    documents?: Document[];
     timestamp: Date;
 }
 
@@ -83,6 +85,34 @@ export default function ChatPage() {
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
+
+    // Voice recognition
+    const {
+        isListening,
+        isSupported: isVoiceSupported,
+        transcript,
+        interimTranscript,
+        toggleListening,
+        resetTranscript,
+        error: voiceError
+    } = useVoiceRecognition({
+        language: 'pt-PT'
+    });
+
+    // Handle voice stop - capture text
+    useEffect(() => {
+        if (!isListening && (transcript || interimTranscript)) {
+            const fullText = transcript + interimTranscript;
+            if (fullText.trim()) {
+                setInput(prev => {
+                    // Avoid duplicating if the text was already added
+                    if (prev.endsWith(fullText)) return prev;
+                    return prev + (prev ? ' ' : '') + fullText;
+                });
+                resetTranscript();
+            }
+        }
+    }, [isListening, transcript, interimTranscript, resetTranscript]);
 
     // Load conversation if ID is in URL
     useEffect(() => {
@@ -222,7 +252,7 @@ export default function ChatPage() {
                         break;
 
                     case 'document':
-                        // Document generated - open panel automatically
+                        // Document generated - open panel automatically AND save to message
                         if (event.data) {
                             const doc: Document = {
                                 id: event.data.documentId || Date.now().toString(),
@@ -233,10 +263,21 @@ export default function ChatPage() {
                                 pdfFileName: event.data.pdfFileName,
                                 createdAt: new Date()
                             };
+
+                            // Open panel
                             setDocumentPanel({
                                 isOpen: true,
                                 document: doc
                             });
+
+                            // Add to message state for persistent access
+                            setMessages(prev =>
+                                prev.map(msg =>
+                                    msg.id === assistantMessageId
+                                        ? { ...msg, documents: [...(msg.documents || []), doc] }
+                                        : msg
+                                )
+                            );
                         }
                         break;
 
@@ -343,6 +384,7 @@ export default function ChatPage() {
                                     key={message.id}
                                     message={message}
                                     userInitial={firstName.charAt(0).toUpperCase()}
+                                    onViewDocument={(doc) => setDocumentPanel({ isOpen: true, document: doc })}
                                 />
                             ))}
 
@@ -382,25 +424,68 @@ export default function ChatPage() {
                 {/* Input Area */}
                 <div className="p-4 pb-6">
                     <div className="max-w-3xl mx-auto">
-                        <div className="relative flex items-end bg-gray-100 rounded-2xl border border-gray-200 focus-within:border-gray-300 transition-colors">
-                            {/* Textarea */}
-                            <textarea
-                                ref={inputRef}
-                                value={input}
-                                onChange={(e) => setInput(e.target.value)}
-                                onKeyDown={handleKeyDown}
-                                placeholder="Pergunte ao assistente..."
-                                rows={1}
-                                className="flex-1 py-3 px-4 bg-transparent resize-none focus:outline-none text-gray-800 placeholder:text-gray-400 max-h-[200px]"
-                                disabled={isLoading}
-                            />
+                        <div className="relative flex items-end bg-gray-100 rounded-2xl border border-gray-200 focus-within:border-gray-300 transition-colors p-2 gap-2">
+                            {/* Attachment Button */}
+                            <button
+                                className="p-2 mb-[2px] text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-full transition-colors"
+                                title="Anexar arquivo (Em breve)"
+                            >
+                                <PlusIcon className="w-5 h-5" />
+                            </button>
+
+                            {/* Textarea or Voice Visualizer */}
+                            {isListening ? (
+                                <div className="flex-1 flex items-center gap-3 py-3 px-2 overflow-hidden h-[46px]">
+                                    {/* Animated Wave */}
+                                    <div className="flex items-center gap-1 h-full select-none">
+                                        <div className="w-1 bg-primary rounded-full animate-[wave_1s_ease-in-out_infinite]" style={{ height: '40%' }}></div>
+                                        <div className="w-1 bg-primary rounded-full animate-[wave_1s_ease-in-out_infinite_0.1s]" style={{ height: '70%' }}></div>
+                                        <div className="w-1 bg-primary rounded-full animate-[wave_1s_ease-in-out_infinite_0.2s]" style={{ height: '100%' }}></div>
+                                        <div className="w-1 bg-primary rounded-full animate-[wave_1s_ease-in-out_infinite_0.1s]" style={{ height: '60%' }}></div>
+                                        <div className="w-1 bg-primary rounded-full animate-[wave_1s_ease-in-out_infinite_0.3s]" style={{ height: '80%' }}></div>
+                                    </div>
+
+                                    <div className="flex-1 text-gray-600 truncate font-medium">
+                                        {transcript + interimTranscript || 'Ouvindo...'}
+                                    </div>
+                                </div>
+                            ) : (
+                                <textarea
+                                    ref={inputRef}
+                                    value={input}
+                                    onChange={(e) => setInput(e.target.value)}
+                                    onKeyDown={handleKeyDown}
+                                    placeholder="Pergunte ao assistente..."
+                                    rows={1}
+                                    className="flex-1 py-3 bg-transparent resize-none focus:outline-none text-gray-800 placeholder:text-gray-400 max-h-[200px]"
+                                    disabled={isLoading}
+                                />
+                            )}
+
+                            {/* Microphone Button */}
+                            {isVoiceSupported && (
+                                <button
+                                    onClick={toggleListening}
+                                    className={`
+                                        p-2 mb-[2px] rounded-full transition-all duration-200
+                                        ${isListening
+                                            ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30'
+                                            : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200'
+                                        }
+                                    `}
+                                    title={isListening ? 'Parar gravação' : 'Gravar áudio'}
+                                    disabled={isLoading}
+                                >
+                                    <MicrophoneIcon className="w-5 h-5" />
+                                </button>
+                            )}
 
                             {/* Send button */}
                             <button
                                 onClick={() => handleSend()}
                                 disabled={!input.trim() || isLoading}
                                 className={`
-                                m-2 p-2 rounded-full transition-colors
+                                p-2 mb-[2px] rounded-full transition-colors
                                 ${input.trim() && !isLoading
                                         ? 'bg-primary text-white hover:bg-primary/90'
                                         : 'bg-gray-300 text-gray-500 cursor-not-allowed'
@@ -475,11 +560,8 @@ const sanitizeContent = (content: string): string => {
     // Remove "ID: xxx" patterns
     sanitized = sanitized.replace(/ID:\s*[a-f0-9]{24}/gi, '');
 
-    // Clean up any double spaces left behind
-    sanitized = sanitized.replace(/\s{2,}/g, ' ');
-
-    // Clean up spaces before punctuation
-    sanitized = sanitized.replace(/\s+([.,;:!?])/g, '$1');
+    // Clean up any double spaces left behind (but preserve newlines)
+    sanitized = sanitized.replace(/[ \t]{2,}/g, ' ');
 
     return sanitized.trim();
 };
@@ -488,7 +570,7 @@ const sanitizeContent = (content: string): string => {
 // Sub-components
 // =============================================
 
-function MessageBubble({ message }: { message: Message; userInitial?: string }) {
+function MessageBubble({ message, userInitial, onViewDocument }: { message: Message; userInitial?: string; onViewDocument?: (doc: Document) => void }) {
     const isUser = message.role === 'user';
     const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
     const [galleryOpen, setGalleryOpen] = useState(false);
@@ -620,10 +702,98 @@ function MessageBubble({ message }: { message: Message; userInitial?: string }) 
         };
     };
 
+    // Extract documents from tool results for display
+    const extractDocuments = (toolResults?: any[]): Document[] => {
+        const docs: Document[] = [];
+        const seenIds = new Set<string>();
+
+        if (toolResults) {
+            toolResults.forEach(result => {
+                let data = result;
+                if (typeof result === 'string') {
+                    try { data = JSON.parse(result); } catch (e) { }
+                }
+
+                // Handle both single object and array results
+                const items = Array.isArray(data) ? data :
+                    (data.documents || data.campaigns || (data.campaign_name ? [data] : []));
+
+                if (Array.isArray(items)) {
+                    items.forEach((item: any) => {
+                        const id = item.id || item._id;
+                        const driveLink = item.driveLink || item.drive_link;
+
+                        if (id && (driveLink || item.campaign_name || item.title)) {
+                            let type = item.type;
+                            if (!type) {
+                                if (item.campaign_name) type = 'campaign';
+                                else if (item.title?.toLowerCase().includes('pesquisa')) type = 'market_research';
+                                else if (item.title?.toLowerCase().includes('plano')) type = 'strategic_plan';
+                            }
+
+                            if (type && !seenIds.has(id)) {
+                                seenIds.add(id);
+                                docs.push({
+                                    id,
+                                    type: type,
+                                    title: item.title || item.campaign_name || 'Documento',
+                                    content: item.content || item.description || '',
+                                    driveLink: driveLink,
+                                    pdfFileName: item.pdfFileName || item.pdf_file_name,
+                                    createdAt: item.createdAt ? new Date(item.createdAt) : new Date()
+                                });
+                            }
+                        }
+                    });
+                }
+            });
+        }
+        return docs;
+    };
+
     const { cleanContent, mediaItems } = extractMedia(message.content, message.toolResultData);
+    const extractedDocuments = extractDocuments(message.toolResultData);
+
+    // Combine explicit message documents with extracted ones, avoiding duplicates
+    const allDocuments = [...(message.documents || [])];
+    extractedDocuments.forEach((doc: Document) => {
+        if (!allDocuments.some(d => d.id === doc.id)) {
+            allDocuments.push(doc);
+        }
+    });
 
     // Sanitize content to remove technical IDs
     const sanitizedContent = sanitizeContent(cleanContent);
+
+    // Build a map of Drive Links -> Document Info from tool results
+    const linkMap = new Map<string, { id: string; type: any; title: string }>();
+
+    if (message.toolResultData) {
+        message.toolResultData.forEach(result => {
+            let data = result;
+            if (typeof result === 'string') {
+                try { data = JSON.parse(result); } catch (e) { }
+            }
+
+            // Check for documents list structure (from list_documents or list_campaigns)
+            // Expecting array of objects with driveLink/drive_link and _id/id
+            const items = Array.isArray(data) ? data :
+                (data.documents || data.campaigns || data.contents || []);
+
+            if (Array.isArray(items)) {
+                items.forEach((item: any) => {
+                    const link = item.driveLink || item.drive_link;
+                    const id = item.id || item._id;
+                    const type = item.type || (item.campaign_name ? 'campaign' : undefined);
+
+                    if (link && id && type) {
+                        // Normalize link (remove query params if needed, but usually exact match is best)
+                        linkMap.set(link, { id, type, title: item.title || item.campaign_name || 'Documento' });
+                    }
+                });
+            }
+        });
+    }
 
     if (isUser) {
         return (
@@ -651,11 +821,60 @@ function MessageBubble({ message }: { message: Message; userInitial?: string }) 
                             h1: ({ children }) => <h1 className="text-xl font-bold text-gray-900 mt-4 mb-3">{children}</h1>,
                             h2: ({ children }) => <h2 className="text-lg font-bold text-gray-900 mt-4 mb-2">{children}</h2>,
                             h3: ({ children }) => <h3 className="text-base font-bold text-gray-900 mt-3 mb-2">{children}</h3>,
-                            a: ({ href, children }) => (
-                                <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">
-                                    {children}
-                                </a>
-                            ),
+                            a: ({ href, children }) => {
+                                if (!href) return <span>{children}</span>;
+
+                                // 1. Check if we have a direct mapping for this link
+                                const mappedDoc = linkMap.get(href);
+                                if (mappedDoc && onViewDocument) {
+                                    return (
+                                        <button
+                                            onClick={() => onViewDocument({
+                                                id: mappedDoc.id,
+                                                type: mappedDoc.type,
+                                                title: mappedDoc.title,
+                                                content: '', // Content will be fetched by Panel
+                                                driveLink: href,
+                                                createdAt: new Date()
+                                            })}
+                                            className="text-primary hover:underline font-medium hover:text-primary/80 transition-colors text-left inline-block"
+                                            title="Ver documento"
+                                        >
+                                            {children}
+                                        </button>
+                                    );
+                                }
+
+                                // 2. Check for PDF/Drive links specific patterns used in this app (Fallback)
+                                const isPdf = href?.toLowerCase().includes('.pdf') ||
+                                    href?.includes('drive.google.com') ||
+                                    href?.includes('docs.google.com');
+
+                                if (isPdf && onViewDocument) {
+                                    return (
+                                        <button
+                                            onClick={() => onViewDocument({
+                                                id: href,
+                                                type: 'pdf_document', // Generic type for external PDF links
+                                                title: String(children),
+                                                content: '',
+                                                driveLink: href,
+                                                createdAt: new Date()
+                                            })}
+                                            className="text-primary hover:underline font-medium hover:text-primary/80 transition-colors text-left inline-block"
+                                            title="Ver documento"
+                                        >
+                                            {children}
+                                        </button>
+                                    );
+                                }
+
+                                return (
+                                    <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">
+                                        {children}
+                                    </a>
+                                );
+                            },
                             code: ({ children }) => (
                                 <code className="bg-gray-100 px-2 py-0.5 rounded text-sm font-mono text-gray-800">{children}</code>
                             ),
@@ -687,7 +906,30 @@ function MessageBubble({ message }: { message: Message; userInitial?: string }) 
                     </div>
                 )}
 
-                {/* Tool labels - REMOVED to keep chat clean and user-friendly */}
+                {/* Generated Documents (PDFs) */}
+                {allDocuments.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                        {allDocuments.map((doc, idx) => (
+                            <div key={idx} className="flex items-center gap-3 p-3 bg-red-50 border border-red-100 rounded-xl max-w-sm">
+                                <div className="p-2 bg-white rounded-lg shadow-sm">
+                                    <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                    </svg>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-gray-900 truncate">{doc.title}</p>
+                                    <p className="text-xs text-gray-500">Documento PDF</p>
+                                </div>
+                                <button
+                                    onClick={() => onViewDocument?.(doc)}
+                                    className="px-3 py-1.5 text-xs font-medium text-red-600 bg-white hover:bg-red-50 border border-red-200 rounded-lg transition-colors shadow-sm"
+                                >
+                                    Ver PDF
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -696,6 +938,22 @@ function MessageBubble({ message }: { message: Message; userInitial?: string }) 
 // =============================================
 // Icon Components
 // =============================================
+
+function PlusIcon({ className }: { className?: string }) {
+    return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+        </svg>
+    );
+}
+
+function MicrophoneIcon({ className }: { className?: string }) {
+    return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+        </svg>
+    );
+}
 
 function ArrowUpIcon({ className }: { className?: string }) {
     return (

@@ -70,7 +70,7 @@ export const dashboardService = {
      * GET /api/v1/dashboard/summary
      */
     async getSummary(): Promise<ApiResponse<DashboardSummary>> {
-        return api.get<DashboardSummary>('/v1/dashboard/summary');
+        return api.get<DashboardSummary>('/dashboard/summary');
     },
 
     /**
@@ -78,7 +78,7 @@ export const dashboardService = {
      * GET /api/v1/dashboard/activity
      */
     async getActivity(limit = 20): Promise<ApiResponse<Activity[]>> {
-        return api.get<Activity[]>(`/v1/dashboard/activity?limit=${limit}`);
+        return api.get<Activity[]>(`/dashboard/activity?limit=${limit}`);
     },
 
     /**
@@ -86,7 +86,7 @@ export const dashboardService = {
      * GET /api/v1/dashboard/campaigns/stats
      */
     async getCampaignStats(): Promise<ApiResponse<CampaignStats[]>> {
-        return api.get<CampaignStats[]>('/v1/dashboard/campaigns/stats');
+        return api.get<CampaignStats[]>('/dashboard/campaigns/stats');
     },
 };
 

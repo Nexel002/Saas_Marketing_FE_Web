@@ -388,7 +388,12 @@ function ConversationItem({
                 className="flex items-center gap-2 flex-1 min-w-0 pr-2"
             >
                 <HistoryIcon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-primary' : 'text-gray-400'}`} />
-                <span className="truncate text-sm">{conversation.title || 'Nova conversa'}</span>
+                <span className="truncate text-sm">
+                    {conversation.title && !conversation.title.startsWith('[SYSTEM:')
+                        ? conversation.title
+                        : `Conversa ${conversation._id.slice(-4)}`
+                    }
+                </span>
             </Link>
 
             <div className="hidden group-hover:flex items-center gap-1">

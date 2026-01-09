@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Eye, Download, Share2, X } from 'lucide-react';
 import { Document } from '@/types/document';
+import { documentsService } from '@/lib/api';
 
 /**
  * Document Panel Component
@@ -19,8 +20,40 @@ interface DocumentPanelProps {
     onClose: () => void;
 }
 
-export function DocumentPanel({ isOpen, document, onClose }: DocumentPanelProps) {
+export function DocumentPanel({ isOpen, document: initialDocument, onClose }: DocumentPanelProps) {
     const [isLoading, setIsLoading] = useState(false);
+    const [document, setDocument] = useState<Document | undefined>(initialDocument);
+
+    // Update local state when prop changes
+    useEffect(() => {
+        setDocument(initialDocument);
+    }, [initialDocument]);
+
+    // Fetch content if missing
+    useEffect(() => {
+        const fetchContent = async () => {
+            if (isOpen && document?.id && document?.type && !document.content && !isLoading) {
+                // Skip if ID is a URL (fallback mode)
+                if (document.id.startsWith('http')) return;
+
+                try {
+                    setIsLoading(true);
+                    // Use a type assertion or mapping if necessary, assuming document.type matches API expected types
+                    // The API expects 'market_research' | 'strategic_plan' | 'campaign'
+                    const response = await documentsService.get(document.type, document.id);
+                    if (response.success && response.data) {
+                        setDocument(prev => prev ? { ...prev, content: response.data?.content || '' } : undefined);
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch document content:', error);
+                } finally {
+                    setIsLoading(false);
+                }
+            }
+        };
+
+        fetchContent();
+    }, [isOpen, document?.id, document?.type, document?.content]);
 
     if (!isOpen) return null;
 

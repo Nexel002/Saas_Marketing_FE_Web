@@ -52,7 +52,7 @@ export interface ConversationSummary {
 }
 
 export interface SSEEvent {
-    event: 'start' | 'chunk' | 'token' | 'tool_call' | 'tool_result' | 'done' | 'error';
+    event: 'start' | 'chunk' | 'token' | 'tool_call' | 'tool_result' | 'document' | 'done' | 'error';
     data: any;
 }
 
@@ -68,7 +68,7 @@ export const chatService = {
     async getConversations(page = 1, limit = 20): Promise<ConversationSummary[]> {
         try {
             const response = await fetch(
-                `${API_BASE_URL}/v1/chat/conversations?page=${page}&limit=${limit}`,
+                `${API_BASE_URL}/chat/conversations?page=${page}&limit=${limit}`,
                 {
                     headers: {
                         'Authorization': `Bearer ${getToken()}`,
@@ -94,7 +94,7 @@ export const chatService = {
     async getConversation(conversationId: string): Promise<Conversation | null> {
         try {
             const response = await fetch(
-                `${API_BASE_URL}/v1/chat/conversations/${conversationId}`,
+                `${API_BASE_URL}/chat/conversations/${conversationId}`,
                 {
                     headers: {
                         'Authorization': `Bearer ${getToken()}`,
@@ -119,7 +119,7 @@ export const chatService = {
      */
     async createConversation(title?: string, businessId?: string): Promise<Conversation | null> {
         try {
-            const response = await fetch(`${API_BASE_URL}/v1/chat/conversations`, {
+            const response = await fetch(`${API_BASE_URL}/chat/conversations`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${getToken()}`,
@@ -156,10 +156,10 @@ export const chatService = {
     ): AsyncGenerator<SSEEvent> {
         const token = getToken();
         console.log('[Chat] Sending message to API:', { message, conversationId, hasToken: !!token });
-        console.log('[Chat] API URL:', `${API_BASE_URL}/v1/chat/message`);
+        console.log('[Chat] API URL:', `${API_BASE_URL}/chat/message`);
 
         try {
-            const response = await fetch(`${API_BASE_URL}/v1/chat/message`, {
+            const response = await fetch(`${API_BASE_URL}/chat/message`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -284,7 +284,7 @@ export const chatService = {
     async deleteConversation(conversationId: string): Promise<boolean> {
         try {
             const response = await fetch(
-                `${API_BASE_URL}/v1/chat/conversations/${conversationId}`,
+                `${API_BASE_URL}/chat/conversations/${conversationId}`,
                 {
                     method: 'DELETE',
                     headers: {
@@ -308,7 +308,7 @@ export const chatService = {
     async renameConversation(conversationId: string, title: string): Promise<boolean> {
         try {
             const response = await fetch(
-                `${API_BASE_URL}/v1/chat/conversations/${conversationId}`,
+                `${API_BASE_URL}/chat/conversations/${conversationId}`,
                 {
                     method: 'PATCH',
                     headers: {
