@@ -238,7 +238,7 @@ export default function ChatPage() {
             const response = await assetsService.uploadAsset(businessId, file, 'product');
             if (response.success && response.data) {
                 return {
-                    url: response.data.driveWebLink,
+                    url: response.data.driveWebLink || '',
                     name: file.name,
                     driveLink: response.data.driveWebLink
                 };
