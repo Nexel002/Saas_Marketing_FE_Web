@@ -157,6 +157,7 @@ function MediaCard({ item, isMuted, onToggleMute, isActive }: MediaCardProps) {
                     muted={isMuted}
                     loop
                     playsInline
+                    controls={false}
                     poster={item.thumbnail}
                 />
             )}

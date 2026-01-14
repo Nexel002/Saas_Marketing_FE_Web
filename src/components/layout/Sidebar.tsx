@@ -46,19 +46,9 @@ const navItems: NavItem[] = [
         icon: <ChatIcon />,
     },
     {
-        name: 'Pesquisa',
-        href: '/research',
-        icon: <SearchIcon />,
-    },
-    {
-        name: 'Plano',
-        href: '/strategic-plan',
+        name: 'Documentos',
+        href: '/documents',
         icon: <PlanIcon />,
-    },
-    {
-        name: 'Campanhas',
-        href: '/campaigns',
-        icon: <CampaignIcon />,
     },
     {
         name: 'Conteúdos',

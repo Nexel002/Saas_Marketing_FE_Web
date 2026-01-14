@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import { Card, Button, MediaCarousel, ContentGalleryModal, MediaItem } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
-import { chatService, SSEEvent } from '@/lib/api';
+import { chatService, SSEEvent, assetsService, businessService } from '@/lib/api';
 import { DocumentPanel } from '@/components/chat/DocumentPanel';
 import { DocumentPanelState, Document } from '@/types/document';
 import { useVoiceRecognition } from '@/hooks/useVoiceRecognition';
@@ -27,6 +27,7 @@ interface Message {
     toolCalls?: string[];
     toolResultData?: any[];
     documents?: Document[];
+    uploadedImages?: Array<{ url: string; name: string; driveLink?: string }>;
     timestamp: Date;
 }
 
@@ -83,8 +84,15 @@ export default function ChatPage() {
         document: undefined
     });
 
+    // File upload state
+    const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+    const [businessId, setBusinessId] = useState<string | null>(null);
+
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Voice recognition
     const {
@@ -163,18 +171,210 @@ export default function ChatPage() {
         }
     }, []);
 
+    // Load business ID on mount
+    useEffect(() => {
+        const loadBusinessId = async () => {
+            try {
+                const response = await businessService.getAll();
+                if (response.success && response.data && response.data.length > 0) {
+                    setBusinessId(response.data[0]._id);
+                }
+            } catch (error) {
+                console.error('Failed to load business:', error);
+            }
+        };
+        loadBusinessId();
+    }, []);
+
+    // Handle file selection
+    const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = event.target.files;
+        if (files && files.length > 0) {
+            const newFiles: File[] = [];
+            const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
+            // Check limit
+            if (selectedFiles.length + files.length > 5) {
+                setUploadError('Máximo de 5 imagens permitido.');
+                return;
+            }
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+
+                // Validate type
+                if (!allowedTypes.includes(file.type)) {
+                    setUploadError(`Tipo de arquivo não suportado: ${file.name}. Use JPEG, PNG, GIF ou WebP.`);
+                    continue;
+                }
+
+                // Validate size
+                if (file.size > 10 * 1024 * 1024) {
+                    setUploadError(`Arquivo muito grande: ${file.name}. Máximo 10MB.`);
+                    continue;
+                }
+
+                newFiles.push(file);
+            }
+
+            if (newFiles.length > 0) {
+                setSelectedFiles(prev => [...prev, ...newFiles]);
+                setUploadError(null);
+            }
+        }
+        // Reset input
+        event.target.value = '';
+    };
+
+    // Remove file from selection
+    const handleRemoveFile = (index: number) => {
+        setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    };
+
+    // Helper to upload a single file
+    const uploadSingleFile = async (file: File): Promise<{ url: string; name: string; driveLink?: string } | null> => {
+        if (!businessId) return null;
+        try {
+            const response = await assetsService.uploadAsset(businessId, file, 'product');
+            if (response.success && response.data) {
+                return {
+                    url: response.data.driveWebLink,
+                    name: file.name,
+                    driveLink: response.data.driveWebLink
+                };
+            }
+        } catch (error) {
+            console.error(`Failed to upload ${file.name}:`, error);
+        }
+        return null;
+    };
+
+    // Handle paste event for images (like Gemini/ChatGPT)
+    const handlePaste = (event: React.ClipboardEvent) => {
+        const items = event.clipboardData?.items;
+        if (!items) return;
+
+        const newFiles: File[] = [];
+
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+
+            // Check if item is an image
+            if (item.type.startsWith('image/')) {
+                event.preventDefault();
+
+                const file = item.getAsFile();
+                if (!file) continue;
+
+                // Check limit
+                if (selectedFiles.length + newFiles.length >= 5) {
+                    setUploadError('Máximo de 5 imagens permitido.');
+                    break;
+                }
+
+                // Validate file type
+                const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+                if (!allowedTypes.includes(file.type)) {
+                    continue;
+                }
+
+                // Validate file size (10MB max)
+                if (file.size > 10 * 1024 * 1024) {
+                    continue;
+                }
+
+                // Generate a friendly name for pasted images
+                const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '');
+                const extension = file.type.split('/')[1] || 'png';
+                // Add index to timestamp to avoid name collision if multiple pasted at once
+                const renamedFile = new File([file], `pasted_image_${timestamp}_${i}.${extension}`, { type: file.type });
+
+                newFiles.push(renamedFile);
+            }
+        }
+
+        if (newFiles.length > 0) {
+            setSelectedFiles(prev => [...prev, ...newFiles]);
+            setUploadError(null);
+        }
+    };
+
+
     const handleSend = async (text?: string) => {
         const messageText = text || input.trim();
-        if (!messageText || isLoading) return;
+        const hasFiles = selectedFiles.length > 0;
+
+        if ((!messageText && !hasFiles) || isLoading || isUploading) return;
+
+        // Process uploads if any
+        let uploadedImagesData: Array<{ url: string; name: string; driveLink?: string }> = [];
+
+        if (hasFiles) {
+            if (!businessId) {
+                setUploadError('Erro: ID do negócio não encontrado. Recarregue a página.');
+                return;
+            }
+
+            setIsUploading(true);
+            try {
+                // Upload files sequentially to prevent server concurrency issues
+                let successCount = 0;
+                let failCount = 0;
+
+                for (const file of selectedFiles) {
+                    try {
+                        const result = await uploadSingleFile(file);
+                        if (result) {
+                            uploadedImagesData.push(result);
+                            successCount++;
+                        } else {
+                            failCount++;
+                            console.error(`Falha no upload do arquivo: ${file.name}`);
+                        }
+                    } catch (innerError) {
+                        failCount++;
+                        console.error(`Exceção no upload de ${file.name}:`, innerError);
+                    }
+                }
+
+                // If everything failed
+                if (successCount === 0) {
+                    setUploadError(`Falha no upload. Todas as ${selectedFiles.length} imagens falharam.`);
+                    setIsUploading(false);
+                    return;
+                }
+
+                // If partial failure, we proceed with what succeeded but could warn user
+                // For now, we proceed silently with successful ones, or could append a note to content.
+
+            } catch (err: any) {
+                console.error('Error uploading batch:', err);
+                setUploadError(`Erro crítico ao enviar imagens: ${err.message || 'Erro desconhecido'}`);
+                setIsUploading(false);
+                return;
+            }
+            setIsUploading(false);
+        }
+
+        // Determine final content for the user message
+        let userContent = messageText;
+        if (uploadedImagesData.length > 0) {
+            if (!userContent) {
+                userContent = `Enviei ${uploadedImagesData.length} imagem(ns): ${uploadedImagesData.map(img => img.name).join(', ')}`;
+            }
+        }
 
         const userMessage: Message = {
             id: Date.now().toString(),
             role: 'user',
-            content: messageText,
+            content: userContent,
+            uploadedImages: uploadedImagesData.length > 0 ? uploadedImagesData : undefined,
             timestamp: new Date(),
         };
+
         setMessages(prev => [...prev, userMessage]);
         setInput('');
+        setSelectedFiles([]); // Clear files after sending
         setIsLoading(true);
         setCurrentTool(null);
 
@@ -194,8 +394,8 @@ export default function ChatPage() {
             // Inject User ID context for new conversations (invisible to user in UI but sent to API)
             // This prevents the AI from asking for the ID which should be handled by the system
             const messageToSend = (!conversationId && user?._id)
-                ? `[SYSTEM: The current User ID is "${user._id}". Use this ID automatically for any tool calls that require a 'userId' parameter. Do NOT ask the user for their ID.]\n\n${messageText}`
-                : messageText;
+                ? `[SYSTEM: The current User ID is "${user._id}". Use this ID automatically for any tool calls that require a 'userId' parameter. Do NOT ask the user for their ID.]\n\n${userContent}`
+                : userContent;
 
             for await (const event of chatService.sendMessage(messageToSend, conversationId || undefined)) {
                 switch (event.event) {
@@ -424,11 +624,73 @@ export default function ChatPage() {
                 {/* Input Area */}
                 <div className="p-4 pb-6">
                     <div className="max-w-3xl mx-auto">
+                        {/* File Preview (Multiple) */}
+                        {selectedFiles.length > 0 && (
+                            <div className="mb-3">
+                                <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent px-1">
+                                    {selectedFiles.map((file, index) => (
+                                        <div key={index} className="relative flex-shrink-0 group">
+                                            {/* Image */}
+                                            <div className="w-20 h-20 rounded-xl overflow-hidden bg-gray-100 border border-gray-200 shadow-sm">
+                                                <img
+                                                    src={URL.createObjectURL(file)}
+                                                    alt={`Preview ${index}`}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            </div>
+
+                                            {/* Remove Button */}
+                                            {!isUploading && (
+                                                <button
+                                                    onClick={() => handleRemoveFile(index)}
+                                                    className="absolute -top-2 -right-2 bg-gray-900/90 text-white rounded-full p-1 shadow-lg hover:bg-black transition-all transform hover:scale-105"
+                                                    title="Remover imagem"
+                                                >
+                                                    <XIcon className="w-3 h-3" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+
+                                    {/* Loading State Overlay */}
+                                    {isUploading && (
+                                        <div className="w-20 h-20 rounded-xl bg-gray-50 border border-dashed border-primary/50 flex flex-col items-center justify-center text-primary flex-shrink-0 animate-pulse">
+                                            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-1" />
+                                            <span className="text-[10px] font-medium">A enviar...</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {uploadError && (
+                                    <p className="mt-1 text-xs text-red-500 pl-1">{uploadError}</p>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Upload Error (when no file selected) */}
+                        {uploadError && selectedFiles.length === 0 && (
+                            <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-xl">
+                                <p className="text-sm text-red-600">{uploadError}</p>
+                            </div>
+                        )}
+
                         <div className="relative flex items-end bg-gray-100 rounded-2xl border border-gray-200 focus-within:border-gray-300 transition-colors p-2 gap-2">
+                            {/* Hidden File Input */}
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/jpeg,image/png,image/gif,image/webp"
+                                multiple
+                                onChange={handleFileSelect}
+                                className="hidden"
+                            />
+
                             {/* Attachment Button */}
                             <button
+                                onClick={() => fileInputRef.current?.click()}
                                 className="p-2 mb-[2px] text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-full transition-colors"
-                                title="Anexar arquivo (Em breve)"
+                                title="Anexar imagem"
+                                disabled={isLoading || isUploading}
                             >
                                 <PlusIcon className="w-5 h-5" />
                             </button>
@@ -455,10 +717,11 @@ export default function ChatPage() {
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
                                     onKeyDown={handleKeyDown}
-                                    placeholder="Pergunte ao assistente..."
+                                    onPaste={handlePaste}
+                                    placeholder="Pergunte ao assistente... (Cole imagens com Ctrl+V)"
                                     rows={1}
                                     className="flex-1 py-3 bg-transparent resize-none focus:outline-none text-gray-800 placeholder:text-gray-400 max-h-[200px]"
-                                    disabled={isLoading}
+                                    disabled={isLoading || isUploading}
                                 />
                             )}
 
@@ -474,7 +737,7 @@ export default function ChatPage() {
                                         }
                                     `}
                                     title={isListening ? 'Parar gravação' : 'Gravar áudio'}
-                                    disabled={isLoading}
+                                    disabled={isLoading || isUploading}
                                 >
                                     <MicrophoneIcon className="w-5 h-5" />
                                 </button>
@@ -483,10 +746,10 @@ export default function ChatPage() {
                             {/* Send button */}
                             <button
                                 onClick={() => handleSend()}
-                                disabled={!input.trim() || isLoading}
+                                disabled={(!input.trim() && selectedFiles.length === 0) || isLoading || isUploading}
                                 className={`
                                 p-2 mb-[2px] rounded-full transition-colors
-                                ${input.trim() && !isLoading
+                                ${(input.trim() || selectedFiles.length > 0) && !isLoading && !isUploading
                                         ? 'bg-primary text-white hover:bg-primary/90'
                                         : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                     }
@@ -551,8 +814,12 @@ const getToolFriendlyName = (toolName: string): string => {
 const sanitizeContent = (content: string): string => {
     if (!content) return content;
 
+    // Remove internal SYSTEM messages (like User ID injection)
+    // Using [\s\S] instead of . with 's' flag for cross-line matching
+    let sanitized = content.replace(/\[SYSTEM:[^\]]*\]/, '');
+
     // Remove MongoDB ObjectId patterns: (ID: 507f1f77bcf86cd799439011)
-    let sanitized = content.replace(/\(ID:\s*[a-f0-9]{24}\s*\)/gi, '');
+    sanitized = sanitized.replace(/\(ID:\s*[a-f0-9]{24}\s*\)/gi, '');
 
     // Remove standalone ObjectIds in parentheses
     sanitized = sanitized.replace(/\([a-f0-9]{24}\)/g, '');
@@ -611,21 +878,29 @@ function MessageBubble({ message, userInitial, onViewDocument }: { message: Mess
                 // Adjust based on your actual backend tool output structure.
                 // Assuming result object has 'contents' property directly or result.result check.
 
-                const contents = data.contents || (data.result && data.result.contents);
+                const contents = data.contents || (data.result && data.result.contents) || data.images || data.videos;
 
                 if (Array.isArray(contents)) {
                     contents.forEach((item: any) => {
-                        if (item.driveLink || item.drive_web_link) { // drive_web_link is what backend usually returns
-                            const originalUrl = item.driveLink || item.drive_web_link;
+                        // Support various url property names
+                        const originalUrl = item.driveLink || item.drive_web_link || item.url;
+
+                        if (originalUrl) {
                             const displayUrl = formatUrlForDisplay(originalUrl);
 
                             if (!seenIds.has(originalUrl)) {
                                 seenIds.add(originalUrl);
+
+                                // Robust type detection
+                                const itemType = (item.type || item.content_type || '').toLowerCase();
+                                const isVideo = itemType === 'video' || itemType.includes('video') || itemType === 'mp4';
+
                                 mediaItems.push({
                                     id: originalUrl,
-                                    type: (item.type === 'video' || item.content_type === 'video') ? 'video' : 'image',
+                                    type: isVideo ? 'video' : 'image',
                                     url: displayUrl,
-                                    title: item.name || item.content_name || 'Conteúdo Gerado'
+                                    title: item.title || item.name || item.content_name || 'Conteúdo Gerado',
+                                    thumbnail: item.thumbnail
                                 });
                             }
                         }
@@ -796,10 +1071,50 @@ function MessageBubble({ message, userInitial, onViewDocument }: { message: Mess
     }
 
     if (isUser) {
+        // Helper to convert Drive link to displayable URL
+        const getDisplayUrl = (url: string): string => {
+            const driveMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+            if (driveMatch && driveMatch[1]) {
+                return `https://lh3.googleusercontent.com/d/${driveMatch[1]}`;
+            }
+            return url;
+        };
+
         return (
-            <div className="flex justify-end mb-6">
+            <div className="flex flex-col items-end mb-6 gap-2">
+                {/* Uploaded Images */}
+                {message.uploadedImages && message.uploadedImages.length > 0 && (
+                    <div className="flex flex-wrap gap-2 max-w-[85%] sm:max-w-[75%] justify-end">
+                        {message.uploadedImages.map((img, idx) => (
+                            <a
+                                key={idx}
+                                href={img.driveLink || img.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="group relative block w-32 h-32 rounded-xl overflow-hidden border-2 border-gray-200 hover:border-primary transition-colors shadow-md"
+                                title={`Ver: ${img.name}`}
+                            >
+                                <img
+                                    src={getDisplayUrl(img.url)}
+                                    alt={img.name}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                        // Fallback to placeholder on error
+                                        (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%236b7280"><path d="M4 5h16a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V7a2 2 0 012-2zm0 2v10h16V7H4zm2 2h2v2H6V9zm4 0h8v2h-8V9zm-4 4h12v2H6v-2z"/></svg>';
+                                    }}
+                                />
+                                {/* Hover overlay */}
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <span className="text-white text-xs font-medium">Ver imagem</span>
+                                </div>
+                            </a>
+                        ))}
+                    </div>
+                )}
+
+                {/* Text content */}
                 <div className="bg-slate-800 text-white rounded-2xl rounded-tr-sm px-5 py-3 max-w-[85%] sm:max-w-[75%] shadow-sm">
-                    <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                    <p className="whitespace-pre-wrap leading-relaxed">{sanitizedContent}</p>
                 </div>
             </div>
         );
@@ -959,6 +1274,14 @@ function ArrowUpIcon({ className }: { className?: string }) {
     return (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+        </svg>
+    );
+}
+
+function XIcon({ className }: { className?: string }) {
+    return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
         </svg>
     );
 }

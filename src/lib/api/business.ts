@@ -31,6 +31,90 @@ export interface Business {
     updated_at: string;
 }
 
+/**
+ * Complete Business Profile returned by /business/:id/profile
+ * Includes all data needed for the business page
+ */
+export interface BusinessProfile {
+    id: string;
+    name: string;
+    description?: string;
+    slogan?: string;
+    businessType: BusinessType;
+    brandTone?: BrandTone;
+
+    location: {
+        country: string;
+        city: string;
+        address?: string;
+    };
+
+    contacts: {
+        phone?: string;
+        email?: string;
+        website?: string;
+        preferredChannels?: string[];
+    };
+
+    logo: {
+        url: string;
+        fileName: string;
+        uploadedAt?: string;
+    } | null;
+
+    visualIdentity: {
+        id: string;
+        colors: {
+            primary?: string;
+            secondary?: string;
+            accent?: string;
+            background?: string;
+            text?: string;
+            supportColors?: string[];
+        };
+        typography: {
+            titleFont?: string;
+            bodyFont?: string;
+            accentFont?: string;
+        };
+        style?: string;
+        isComplete: boolean;
+    } | null;
+
+    stats: {
+        campaignsCount: number;
+        researchCount: number;
+        hasStrategicPlan: boolean;
+        uploadsCount: number;
+    };
+
+    marketResearch: {
+        id: string;
+        title: string;
+        createdAt: string;
+        pdfUrl?: string;
+    } | null;
+
+    strategicPlan: {
+        id: string;
+        title: string;
+        createdAt: string;
+        pdfUrl?: string;
+    } | null;
+
+    uploads: Array<{
+        id: string;
+        fileName: string;
+        type: string;
+        url?: string;
+        uploadedAt?: string;
+    }>;
+
+    createdAt: string;
+    updatedAt: string;
+    isActive: boolean;
+}
+
 export type BusinessType =
     | 'BAKERY'
     | 'RESTAURANT'
@@ -58,6 +142,7 @@ export interface CreateBusinessData {
     description?: string;
     city: string;
     country: string;
+    address?: string;
     slogan?: string;
     phone?: string;
     email?: string;
@@ -85,6 +170,14 @@ export const businessService = {
      */
     async getById(id: string): Promise<ApiResponse<Business>> {
         return api.get(`/business/${id}`);
+    },
+
+    /**
+     * Get complete business profile with all data
+     * Includes: logo, visual identity, stats, campaigns count, etc.
+     */
+    async getProfile(id: string): Promise<ApiResponse<BusinessProfile>> {
+        return api.get(`/business/${id}/profile`);
     },
 
     /**

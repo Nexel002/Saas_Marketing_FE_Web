@@ -14,7 +14,7 @@ export type { LoginCredentials, RegisterData, User, AuthResponse } from './auth'
 
 // Business
 export { businessService } from './business';
-export type { Business, BusinessType, BrandTone, CreateBusinessData, UpdateBusinessData } from './business';
+export type { Business, BusinessProfile, BusinessType, BrandTone, CreateBusinessData, UpdateBusinessData } from './business';
 
 // Dashboard
 export { dashboardService } from './dashboard';
@@ -44,3 +44,6 @@ export type { ContentItem, ContentType, ContentStatus, MediaContentItem } from '
 export { documentsService } from './documents';
 export type { Document, DocumentType } from '@/types/document';
 
+// Assets
+export { assetsService } from './assets';
+export type { AssetType, UploadedAsset, AssetListItem, GalleryItem, UploadResponse } from './assets';
