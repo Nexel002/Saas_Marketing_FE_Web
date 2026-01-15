@@ -19,6 +19,7 @@ import {
     StrategicPlan,
     Campaign
 } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Unified Document Type
 interface DocumentItem {
@@ -33,6 +34,7 @@ interface DocumentItem {
 type FilterType = 'ALL' | 'RESEARCH' | 'STRATEGY' | 'CAMPAIGN';
 
 export default function DocumentsPage() {
+    const { user } = useAuth();
     const [documents, setDocuments] = useState<DocumentItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
@@ -40,17 +42,21 @@ export default function DocumentsPage() {
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
     useEffect(() => {
-        loadData();
-    }, []);
+        if (user?._id) {
+            loadData();
+        }
+    }, [user?._id]);
 
     const loadData = async () => {
+        if (!user?._id) return;
+
         setIsLoading(true);
         try {
-            // Fetch all data in parallel
+            // Fetch all data in parallel with userId
             const [researchRes, strategyRes, campaignsRes] = await Promise.all([
-                researchService.list(),
-                strategicPlanService.list(),
-                campaignService.list()
+                researchService.list(user._id),
+                strategicPlanService.list(user._id),
+                campaignService.list(user._id)
             ]);
 
             const newDocs: DocumentItem[] = [];
@@ -147,8 +153,8 @@ export default function DocumentsPage() {
 
     // Filter logic
     const filteredDocs = documents.filter(doc => {
-        // Text Search
-        const matchesSearch = doc.name.toLowerCase().includes(searchQuery.toLowerCase());
+        // Text Search (with null safety)
+        const matchesSearch = (doc.name || '').toLowerCase().includes(searchQuery.toLowerCase());
         // Type Filter
         const matchesType = activeFilter === 'ALL' || doc.type === activeFilter;
 
@@ -208,8 +214,8 @@ export default function DocumentsPage() {
                             key={tab.id}
                             onClick={() => setActiveFilter(tab.id as FilterType)}
                             className={`px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap ${activeFilter === tab.id
-                                    ? 'bg-white text-gray-800 shadow-sm'
-                                    : 'text-gray-500 hover:text-gray-700'
+                                ? 'bg-white text-gray-800 shadow-sm'
+                                : 'text-gray-500 hover:text-gray-700'
                                 }`}
                         >
                             {tab.label}
@@ -256,8 +262,8 @@ export default function DocumentsPage() {
                                     </td>
                                 </tr>
                             ) : (
-                                filteredDocs.map((doc) => (
-                                    <tr key={doc.id} className="hover:bg-gray-50 transition-colors group">
+                                filteredDocs.map((doc, index) => (
+                                    <tr key={doc.id || `doc-${index}`} className="hover:bg-gray-50 transition-colors group">
                                         <td className="py-4 px-6">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0 group-hover:bg-white group-hover:shadow-sm transition-all">
@@ -268,8 +274,8 @@ export default function DocumentsPage() {
                                         </td>
                                         <td className="py-4 px-6">
                                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${doc.type === 'RESEARCH' ? 'bg-blue-50 text-blue-700 border-blue-100' :
-                                                    doc.type === 'STRATEGY' ? 'bg-green-50 text-green-700 border-green-100' :
-                                                        'bg-purple-50 text-purple-700 border-purple-100'
+                                                doc.type === 'STRATEGY' ? 'bg-green-50 text-green-700 border-green-100' :
+                                                    'bg-purple-50 text-purple-700 border-purple-100'
                                                 }`}>
                                                 {getTypeLabel(doc.type)}
                                             </span>
@@ -282,8 +288,8 @@ export default function DocumentsPage() {
                                                 <button
                                                     onClick={() => handleViewPdf(doc.pdfUrl)}
                                                     className={`p-2 rounded-lg transition-colors ${doc.pdfUrl
-                                                            ? 'text-gray-400 hover:text-primary hover:bg-primary/5 cursor-pointer'
-                                                            : 'text-gray-300 cursor-not-allowed'
+                                                        ? 'text-gray-400 hover:text-primary hover:bg-primary/5 cursor-pointer'
+                                                        : 'text-gray-300 cursor-not-allowed'
                                                         }`}
                                                     title={doc.pdfUrl ? "Ver PDF" : "PDF indisponível"}
                                                     disabled={!doc.pdfUrl}

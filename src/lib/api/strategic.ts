@@ -50,10 +50,11 @@ export const strategicPlanService = {
     /**
      * List strategic plans for authenticated user
      * GET /api/v1/strategic-plan
-     * Note: Backend extracts userId from JWT token
+     * @param userId - User ID (required by backend)
      */
-    async list(): Promise<ApiResponse<StrategicPlan[]>> {
-        return api.get<StrategicPlan[]>('/strategic-plan');
+    async list(userId?: string): Promise<ApiResponse<StrategicPlan[]>> {
+        const params = userId ? `?userId=${userId}` : '';
+        return api.get<StrategicPlan[]>(`/strategic-plan${params}`);
     },
 
     /**

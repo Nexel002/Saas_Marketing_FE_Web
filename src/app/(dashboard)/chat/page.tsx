@@ -2,13 +2,20 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
-import ReactMarkdown from 'react-markdown';
-import { Card, Button, MediaCarousel, ContentGalleryModal, MediaItem } from '@/components/ui';
+import dynamic from 'next/dynamic';
+import { Card, Button } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { chatService, SSEEvent, assetsService, businessService } from '@/lib/api';
-import { DocumentPanel } from '@/components/chat/DocumentPanel';
 import { DocumentPanelState, Document } from '@/types/document';
 import { useVoiceRecognition } from '@/hooks/useVoiceRecognition';
+import { getToolFriendlyName } from '@/lib/chatHelpers';
+import { MessageBubble, Message } from '@/components/chat/MessageBubble';
+
+// Lazy load heavy components - only load when needed
+const DocumentPanel = dynamic(() => import('@/components/chat/DocumentPanel'), {
+    loading: () => <div className="animate-pulse bg-gray-100 h-full w-full" />,
+    ssr: false
+});
 
 /**
  * Chat Page - Clean interface without secondary sidebar
@@ -19,17 +26,6 @@ import { useVoiceRecognition } from '@/hooks/useVoiceRecognition';
 // =============================================
 // Types
 // =============================================
-
-interface Message {
-    id: string;
-    role: 'user' | 'assistant';
-    content: string;
-    toolCalls?: string[];
-    toolResultData?: any[];
-    documents?: Document[];
-    uploadedImages?: Array<{ url: string; name: string; driveLink?: string }>;
-    timestamp: Date;
-}
 
 interface Suggestion {
     icon: string;
@@ -113,7 +109,6 @@ export default function ChatPage() {
             const fullText = transcript + interimTranscript;
             if (fullText.trim()) {
                 setInput(prev => {
-                    // Avoid duplicating if the text was already added
                     if (prev.endsWith(fullText)) return prev;
                     return prev + (prev ? ' ' : '') + fullText;
                 });
@@ -127,7 +122,6 @@ export default function ChatPage() {
         if (conversationIdFromUrl) {
             loadConversation(conversationIdFromUrl);
         } else {
-            // Reset when no ID
             setMessages([]);
             setConversationId(null);
         }
@@ -193,7 +187,6 @@ export default function ChatPage() {
             const newFiles: File[] = [];
             const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
-            // Check limit
             if (selectedFiles.length + files.length > 5) {
                 setUploadError('Máximo de 5 imagens permitido.');
                 return;
@@ -202,13 +195,11 @@ export default function ChatPage() {
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
 
-                // Validate type
                 if (!allowedTypes.includes(file.type)) {
                     setUploadError(`Tipo de arquivo não suportado: ${file.name}. Use JPEG, PNG, GIF ou WebP.`);
                     continue;
                 }
 
-                // Validate size
                 if (file.size > 10 * 1024 * 1024) {
                     setUploadError(`Arquivo muito grande: ${file.name}. Máximo 10MB.`);
                     continue;
@@ -222,7 +213,6 @@ export default function ChatPage() {
                 setUploadError(null);
             }
         }
-        // Reset input
         event.target.value = '';
     };
 
@@ -249,7 +239,7 @@ export default function ChatPage() {
         return null;
     };
 
-    // Handle paste event for images (like Gemini/ChatGPT)
+    // Handle paste event for images
     const handlePaste = (event: React.ClipboardEvent) => {
         const items = event.clipboardData?.items;
         if (!items) return;
@@ -259,34 +249,28 @@ export default function ChatPage() {
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
 
-            // Check if item is an image
             if (item.type.startsWith('image/')) {
                 event.preventDefault();
 
                 const file = item.getAsFile();
                 if (!file) continue;
 
-                // Check limit
                 if (selectedFiles.length + newFiles.length >= 5) {
                     setUploadError('Máximo de 5 imagens permitido.');
                     break;
                 }
 
-                // Validate file type
                 const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
                 if (!allowedTypes.includes(file.type)) {
                     continue;
                 }
 
-                // Validate file size (10MB max)
                 if (file.size > 10 * 1024 * 1024) {
                     continue;
                 }
 
-                // Generate a friendly name for pasted images
                 const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '');
                 const extension = file.type.split('/')[1] || 'png';
-                // Add index to timestamp to avoid name collision if multiple pasted at once
                 const renamedFile = new File([file], `pasted_image_${timestamp}_${i}.${extension}`, { type: file.type });
 
                 newFiles.push(renamedFile);
@@ -306,7 +290,6 @@ export default function ChatPage() {
 
         if ((!messageText && !hasFiles) || isLoading || isUploading) return;
 
-        // Process uploads if any
         let uploadedImagesData: Array<{ url: string; name: string; driveLink?: string }> = [];
 
         if (hasFiles) {
@@ -317,9 +300,7 @@ export default function ChatPage() {
 
             setIsUploading(true);
             try {
-                // Upload files sequentially to prevent server concurrency issues
                 let successCount = 0;
-                let failCount = 0;
 
                 for (const file of selectedFiles) {
                     try {
@@ -327,25 +308,17 @@ export default function ChatPage() {
                         if (result) {
                             uploadedImagesData.push(result);
                             successCount++;
-                        } else {
-                            failCount++;
-                            console.error(`Falha no upload do arquivo: ${file.name}`);
                         }
                     } catch (innerError) {
-                        failCount++;
                         console.error(`Exceção no upload de ${file.name}:`, innerError);
                     }
                 }
 
-                // If everything failed
                 if (successCount === 0) {
                     setUploadError(`Falha no upload. Todas as ${selectedFiles.length} imagens falharam.`);
                     setIsUploading(false);
                     return;
                 }
-
-                // If partial failure, we proceed with what succeeded but could warn user
-                // For now, we proceed silently with successful ones, or could append a note to content.
 
             } catch (err: any) {
                 console.error('Error uploading batch:', err);
@@ -356,7 +329,6 @@ export default function ChatPage() {
             setIsUploading(false);
         }
 
-        // Determine final content for the user message
         let userContent = messageText;
         if (uploadedImagesData.length > 0) {
             if (!userContent) {
@@ -374,7 +346,7 @@ export default function ChatPage() {
 
         setMessages(prev => [...prev, userMessage]);
         setInput('');
-        setSelectedFiles([]); // Clear files after sending
+        setSelectedFiles([]);
         setIsLoading(true);
         setCurrentTool(null);
 
@@ -391,8 +363,6 @@ export default function ChatPage() {
         try {
             let fullContent = '';
 
-            // Inject User ID context for new conversations (invisible to user in UI but sent to API)
-            // This prevents the AI from asking for the ID which should be handled by the system
             const messageToSend = (!conversationId && user?._id)
                 ? `[SYSTEM: The current User ID is "${user._id}". Use this ID automatically for any tool calls that require a 'userId' parameter. Do NOT ask the user for their ID.]\n\n${userContent}`
                 : userContent;
@@ -452,7 +422,6 @@ export default function ChatPage() {
                         break;
 
                     case 'document':
-                        // Document generated - open panel automatically AND save to message
                         if (event.data) {
                             const doc: Document = {
                                 id: event.data.documentId || Date.now().toString(),
@@ -464,13 +433,11 @@ export default function ChatPage() {
                                 createdAt: new Date()
                             };
 
-                            // Open panel
                             setDocumentPanel({
                                 isOpen: true,
                                 document: doc
                             });
 
-                            // Add to message state for persistent access
                             setMessages(prev =>
                                 prev.map(msg =>
                                     msg.id === assistantMessageId
@@ -772,480 +739,6 @@ export default function ChatPage() {
                 document={documentPanel.document}
                 onClose={() => setDocumentPanel({ isOpen: false, document: undefined })}
             />
-        </div>
-    );
-}
-
-// =============================================
-// Helper Functions
-// =============================================
-
-/**
- * Convert technical tool names to user-friendly action descriptions
- */
-const getToolFriendlyName = (toolName: string): string => {
-    const toolMap: Record<string, string> = {
-        'describe_business': 'a registar o seu negócio',
-        'get_business_info': 'a obter informações do negócio',
-        'update_business': 'a atualizar o negócio',
-        'run_market_research': 'a fazer pesquisa de mercado',
-        'get_market_research': 'a obter pesquisa de mercado',
-        'run_strategic_plan': 'a criar plano estratégico',
-        'get_strategic_plan': 'a obter plano estratégico',
-        'generate_campaign': 'a criar campanha de marketing',
-        'list_campaigns': 'a listar campanhas',
-        'get_campaign': 'a obter detalhes da campanha',
-        'generate_content': 'a gerar conteúdo',
-        'generate_campaign_contents': 'a gerar conteúdos da campanha',
-        'generate_campaign_images': 'a gerar imagens da campanha',
-        'generate_campaign_videos': 'a gerar vídeos da campanha',
-        'list_campaign_contents': 'a listar conteúdos da campanha',
-        'list_all_business_content': 'a listar todos os conteúdos',
-        'list_generated_content': 'a listar conteúdos gerados',
-        'get_drive_links': 'a obter links do Google Drive',
-    };
-
-    return toolMap[toolName] || `a executar ${toolName.replace(/_/g, ' ')}`;
-};
-
-/**
- * Remove MongoDB ObjectIds and other technical IDs from text
- */
-const sanitizeContent = (content: string): string => {
-    if (!content) return content;
-
-    // Remove internal SYSTEM messages (like User ID injection)
-    // Using [\s\S] instead of . with 's' flag for cross-line matching
-    let sanitized = content.replace(/\[SYSTEM:[^\]]*\]/, '');
-
-    // Remove MongoDB ObjectId patterns: (ID: 507f1f77bcf86cd799439011)
-    sanitized = sanitized.replace(/\(ID:\s*[a-f0-9]{24}\s*\)/gi, '');
-
-    // Remove standalone ObjectIds in parentheses
-    sanitized = sanitized.replace(/\([a-f0-9]{24}\)/g, '');
-
-    // Remove "ID: xxx" patterns
-    sanitized = sanitized.replace(/ID:\s*[a-f0-9]{24}/gi, '');
-
-    // Clean up any double spaces left behind (but preserve newlines)
-    sanitized = sanitized.replace(/[ \t]{2,}/g, ' ');
-
-    return sanitized.trim();
-};
-
-// =============================================
-// Sub-components
-// =============================================
-
-function MessageBubble({ message, userInitial, onViewDocument }: { message: Message; userInitial?: string; onViewDocument?: (doc: Document) => void }) {
-    const isUser = message.role === 'user';
-    const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
-    const [galleryOpen, setGalleryOpen] = useState(false);
-
-    // Helper to convert Google Drive viewer links to direct links
-    const formatUrlForDisplay = (url: string): string => {
-        // Handle Google Drive links
-        // From: https://drive.google.com/file/d/FILE_ID/view?usp=sharing
-        // To:   https://lh3.googleusercontent.com/d/FILE_ID
-        const driveMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
-        if (driveMatch && driveMatch[1]) {
-            // using lh3.googleusercontent.com/d/ is often more reliable for embeddings than drive.google.com/uc
-            return `https://lh3.googleusercontent.com/d/${driveMatch[1]}`;
-        }
-        return url;
-    };
-
-    // Extract media items from content
-    const extractMedia = (content: string, toolResults?: any[]): { cleanContent: string; mediaItems: MediaItem[] } => {
-        const mediaItems: MediaItem[] = [];
-        const seenIds = new Set<string>();
-
-        // 1. Extract from Tool Results (Source of Truth)
-        if (toolResults) {
-            toolResults.forEach(result => {
-                // Check if result has 'contents' array (from list_campaign_contents or generate_campaign_contents)
-                // The tool might return a stringified JSON, so we might need to parse it if it's a string
-                let data = result;
-                if (typeof result === 'string') {
-                    try {
-                        data = JSON.parse(result);
-                    } catch (e) {
-                        // ignore
-                    }
-                }
-
-                // Sometimes the result is nested like { result: ... } or { output: ... }
-                // Adjust based on your actual backend tool output structure.
-                // Assuming result object has 'contents' property directly or result.result check.
-
-                const contents = data.contents || (data.result && data.result.contents) || data.images || data.videos;
-
-                if (Array.isArray(contents)) {
-                    contents.forEach((item: any) => {
-                        // Support various url property names
-                        const originalUrl = item.driveLink || item.drive_web_link || item.url;
-
-                        if (originalUrl) {
-                            const displayUrl = formatUrlForDisplay(originalUrl);
-
-                            if (!seenIds.has(originalUrl)) {
-                                seenIds.add(originalUrl);
-
-                                // Robust type detection
-                                const itemType = (item.type || item.content_type || '').toLowerCase();
-                                const isVideo = itemType === 'video' || itemType.includes('video') || itemType === 'mp4';
-
-                                mediaItems.push({
-                                    id: originalUrl,
-                                    type: isVideo ? 'video' : 'image',
-                                    url: displayUrl,
-                                    title: item.title || item.name || item.content_name || 'Conteúdo Gerado',
-                                    thumbnail: item.thumbnail
-                                });
-                            }
-                        }
-                    });
-                }
-            });
-        }
-
-        // 2. Extract from Markdown Text (Fallback & User pasted links)
-        if (!content) return { cleanContent: '', mediaItems };
-
-        const lines = content.split('\n');
-        const remainingLines: string[] = [];
-
-        lines.forEach(line => {
-            // Updated Regex to match:
-            // 1. Standard markdown images: ![alt](url)
-            // 2. Explicit links with media keywords: [Ver Imagem](url), [Ver Vídeo](url), [Imagem 1](url)
-            const mediaMatch = line.match(/(!)?\[(.*?)\]\((https?:\/\/[^\)]+)\)/i);
-
-            let isMedia = false;
-
-            if (mediaMatch) {
-                const isMarkdownImage = !!mediaMatch[1]; // The "!" prefix
-                const text = mediaMatch[2];
-                const originalUrl = mediaMatch[3];
-
-                const lowerText = text.toLowerCase();
-                const isVideo = lowerText.includes('vídeo') || lowerText.includes('video') || lowerText.includes('assistir');
-                const isImageKeyword = lowerText.includes('imagem') || lowerText.includes('image') || lowerText.includes('foto') || lowerText.includes('ver');
-
-                if (isMarkdownImage || isVideo || isImageKeyword) {
-                    // Check if we already have this URL from tool results
-                    if (!seenIds.has(originalUrl)) {
-                        isMedia = true;
-                        seenIds.add(originalUrl);
-
-                        const type = isVideo ? 'video' : 'image';
-
-                        // Clean title
-                        let title = line.replace(mediaMatch[0], '').trim();
-                        title = title.replace(/^[\*\-]\s*/, '').replace(/:\s*$/, '').trim();
-
-                        if (!title) title = (text !== 'Ver Imagem' && text !== 'Ver Vídeo') ? text : (type === 'video' ? 'Vídeo gerado' : 'Imagem gerada');
-
-                        // Format URL for display (fix Google Drive links)
-                        const displayUrl = formatUrlForDisplay(originalUrl);
-
-                        mediaItems.push({
-                            id: originalUrl,
-                            type: type as 'image' | 'video',
-                            url: displayUrl,
-                            title: title
-                        });
-                    } else {
-                        // It's a media link we already have from tool results. 
-                        // We should probably NOT show the text link to avoid duplication, 
-                        // UNLESS we want to keep the text flow. 
-                        // Let's hide it from text if it's already in carousel.
-                        isMedia = true;
-                    }
-                }
-            }
-
-            if (!isMedia) {
-                remainingLines.push(line);
-            }
-        });
-
-        // Add extra newline to ensure markdown renders correctly
-        return {
-            cleanContent: remainingLines.join('\n'),
-            mediaItems
-        };
-    };
-
-    // Extract documents from tool results for display
-    const extractDocuments = (toolResults?: any[]): Document[] => {
-        const docs: Document[] = [];
-        const seenIds = new Set<string>();
-
-        if (toolResults) {
-            toolResults.forEach(result => {
-                let data = result;
-                if (typeof result === 'string') {
-                    try { data = JSON.parse(result); } catch (e) { }
-                }
-
-                // Handle both single object and array results
-                const items = Array.isArray(data) ? data :
-                    (data.documents || data.campaigns || (data.campaign_name ? [data] : []));
-
-                if (Array.isArray(items)) {
-                    items.forEach((item: any) => {
-                        const id = item.id || item._id;
-                        const driveLink = item.driveLink || item.drive_link;
-
-                        if (id && (driveLink || item.campaign_name || item.title)) {
-                            let type = item.type;
-                            if (!type) {
-                                if (item.campaign_name) type = 'campaign';
-                                else if (item.title?.toLowerCase().includes('pesquisa')) type = 'market_research';
-                                else if (item.title?.toLowerCase().includes('plano')) type = 'strategic_plan';
-                            }
-
-                            if (type && !seenIds.has(id)) {
-                                seenIds.add(id);
-                                docs.push({
-                                    id,
-                                    type: type,
-                                    title: item.title || item.campaign_name || 'Documento',
-                                    content: item.content || item.description || '',
-                                    driveLink: driveLink,
-                                    pdfFileName: item.pdfFileName || item.pdf_file_name,
-                                    createdAt: item.createdAt ? new Date(item.createdAt) : new Date()
-                                });
-                            }
-                        }
-                    });
-                }
-            });
-        }
-        return docs;
-    };
-
-    const { cleanContent, mediaItems } = extractMedia(message.content, message.toolResultData);
-    const extractedDocuments = extractDocuments(message.toolResultData);
-
-    // Combine explicit message documents with extracted ones, avoiding duplicates
-    const allDocuments = [...(message.documents || [])];
-    extractedDocuments.forEach((doc: Document) => {
-        if (!allDocuments.some(d => d.id === doc.id)) {
-            allDocuments.push(doc);
-        }
-    });
-
-    // Sanitize content to remove technical IDs
-    const sanitizedContent = sanitizeContent(cleanContent);
-
-    // Build a map of Drive Links -> Document Info from tool results
-    const linkMap = new Map<string, { id: string; type: any; title: string }>();
-
-    if (message.toolResultData) {
-        message.toolResultData.forEach(result => {
-            let data = result;
-            if (typeof result === 'string') {
-                try { data = JSON.parse(result); } catch (e) { }
-            }
-
-            // Check for documents list structure (from list_documents or list_campaigns)
-            // Expecting array of objects with driveLink/drive_link and _id/id
-            const items = Array.isArray(data) ? data :
-                (data.documents || data.campaigns || data.contents || []);
-
-            if (Array.isArray(items)) {
-                items.forEach((item: any) => {
-                    const link = item.driveLink || item.drive_link;
-                    const id = item.id || item._id;
-                    const type = item.type || (item.campaign_name ? 'campaign' : undefined);
-
-                    if (link && id && type) {
-                        // Normalize link (remove query params if needed, but usually exact match is best)
-                        linkMap.set(link, { id, type, title: item.title || item.campaign_name || 'Documento' });
-                    }
-                });
-            }
-        });
-    }
-
-    if (isUser) {
-        // Helper to convert Drive link to displayable URL
-        const getDisplayUrl = (url: string): string => {
-            const driveMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
-            if (driveMatch && driveMatch[1]) {
-                return `https://lh3.googleusercontent.com/d/${driveMatch[1]}`;
-            }
-            return url;
-        };
-
-        return (
-            <div className="flex flex-col items-end mb-6 gap-2">
-                {/* Uploaded Images */}
-                {message.uploadedImages && message.uploadedImages.length > 0 && (
-                    <div className="flex flex-wrap gap-2 max-w-[85%] sm:max-w-[75%] justify-end">
-                        {message.uploadedImages.map((img, idx) => (
-                            <a
-                                key={idx}
-                                href={img.driveLink || img.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="group relative block w-32 h-32 rounded-xl overflow-hidden border-2 border-gray-200 hover:border-primary transition-colors shadow-md"
-                                title={`Ver: ${img.name}`}
-                            >
-                                <img
-                                    src={getDisplayUrl(img.url)}
-                                    alt={img.name}
-                                    className="w-full h-full object-cover"
-                                    onError={(e) => {
-                                        // Fallback to placeholder on error
-                                        (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%236b7280"><path d="M4 5h16a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V7a2 2 0 012-2zm0 2v10h16V7H4zm2 2h2v2H6V9zm4 0h8v2h-8V9zm-4 4h12v2H6v-2z"/></svg>';
-                                    }}
-                                />
-                                {/* Hover overlay */}
-                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                    <span className="text-white text-xs font-medium">Ver imagem</span>
-                                </div>
-                            </a>
-                        ))}
-                    </div>
-                )}
-
-                {/* Text content */}
-                <div className="bg-slate-800 text-white rounded-2xl rounded-tr-sm px-5 py-3 max-w-[85%] sm:max-w-[75%] shadow-sm">
-                    <p className="whitespace-pre-wrap leading-relaxed">{sanitizedContent}</p>
-                </div>
-            </div>
-        );
-    }
-
-    return (
-        <div className="flex justify-start mb-6 w-full">
-            <div className="max-w-[90%] sm:max-w-[85%] space-y-2">
-                {/* Message Content */}
-                <div className="text-gray-800 leading-relaxed prose prose-sm max-w-none">
-                    <ReactMarkdown
-                        components={{
-                            p: ({ children }) => <p className="mb-3 last:mb-0 leading-7 text-[15px]">{children}</p>,
-                            strong: ({ children }) => <strong className="font-bold text-gray-900">{children}</strong>,
-                            em: ({ children }) => <em className="font-medium text-gray-700">{children}</em>,
-                            ul: ({ children }) => <ul className="list-disc list-outside ml-5 my-3 space-y-2">{children}</ul>,
-                            ol: ({ children }) => <ol className="list-decimal list-outside ml-5 my-3 space-y-2">{children}</ol>,
-                            li: ({ children }) => <li className="leading-7 pl-1">{children}</li>,
-                            h1: ({ children }) => <h1 className="text-xl font-bold text-gray-900 mt-4 mb-3">{children}</h1>,
-                            h2: ({ children }) => <h2 className="text-lg font-bold text-gray-900 mt-4 mb-2">{children}</h2>,
-                            h3: ({ children }) => <h3 className="text-base font-bold text-gray-900 mt-3 mb-2">{children}</h3>,
-                            a: ({ href, children }) => {
-                                if (!href) return <span>{children}</span>;
-
-                                // 1. Check if we have a direct mapping for this link
-                                const mappedDoc = linkMap.get(href);
-                                if (mappedDoc && onViewDocument) {
-                                    return (
-                                        <button
-                                            onClick={() => onViewDocument({
-                                                id: mappedDoc.id,
-                                                type: mappedDoc.type,
-                                                title: mappedDoc.title,
-                                                content: '', // Content will be fetched by Panel
-                                                driveLink: href,
-                                                createdAt: new Date()
-                                            })}
-                                            className="text-primary hover:underline font-medium hover:text-primary/80 transition-colors text-left inline-block"
-                                            title="Ver documento"
-                                        >
-                                            {children}
-                                        </button>
-                                    );
-                                }
-
-                                // 2. Check for PDF/Drive links specific patterns used in this app (Fallback)
-                                const isPdf = href?.toLowerCase().includes('.pdf') ||
-                                    href?.includes('drive.google.com') ||
-                                    href?.includes('docs.google.com');
-
-                                if (isPdf && onViewDocument) {
-                                    return (
-                                        <button
-                                            onClick={() => onViewDocument({
-                                                id: href,
-                                                type: 'pdf_document', // Generic type for external PDF links
-                                                title: String(children),
-                                                content: '',
-                                                driveLink: href,
-                                                createdAt: new Date()
-                                            })}
-                                            className="text-primary hover:underline font-medium hover:text-primary/80 transition-colors text-left inline-block"
-                                            title="Ver documento"
-                                        >
-                                            {children}
-                                        </button>
-                                    );
-                                }
-
-                                return (
-                                    <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-medium">
-                                        {children}
-                                    </a>
-                                );
-                            },
-                            code: ({ children }) => (
-                                <code className="bg-gray-100 px-2 py-0.5 rounded text-sm font-mono text-gray-800">{children}</code>
-                            ),
-                            pre: ({ children }) => (
-                                <pre className="bg-gray-100 p-4 rounded-lg overflow-x-auto text-sm my-3">{children}</pre>
-                            ),
-                            blockquote: ({ children }) => (
-                                <blockquote className="border-l-4 border-primary/30 pl-4 py-2 italic text-gray-600 my-3 bg-gray-50/50 rounded-r">{children}</blockquote>
-                            ),
-                            hr: () => <hr className="my-4 border-gray-200" />,
-                        }}
-                    >
-                        {sanitizedContent || '...'}
-                    </ReactMarkdown>
-                </div>
-
-                {/* Media Carousel */}
-                {mediaItems.length > 0 && (
-                    <div className="mt-4">
-                        <MediaCarousel
-                            items={mediaItems}
-                            onViewAll={() => setGalleryOpen(true)}
-                        />
-                        <ContentGalleryModal
-                            isOpen={galleryOpen}
-                            onClose={() => setGalleryOpen(false)}
-                            items={mediaItems}
-                        />
-                    </div>
-                )}
-
-                {/* Generated Documents (PDFs) */}
-                {allDocuments.length > 0 && (
-                    <div className="mt-4 space-y-2">
-                        {allDocuments.map((doc, idx) => (
-                            <div key={idx} className="flex items-center gap-3 p-3 bg-red-50 border border-red-100 rounded-xl max-w-sm">
-                                <div className="p-2 bg-white rounded-lg shadow-sm">
-                                    <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                    </svg>
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-gray-900 truncate">{doc.title}</p>
-                                    <p className="text-xs text-gray-500">Documento PDF</p>
-                                </div>
-                                <button
-                                    onClick={() => onViewDocument?.(doc)}
-                                    className="px-3 py-1.5 text-xs font-medium text-red-600 bg-white hover:bg-red-50 border border-red-200 rounded-lg transition-colors shadow-sm"
-                                >
-                                    Ver PDF
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
         </div>
     );
 }

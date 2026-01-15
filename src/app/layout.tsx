@@ -39,13 +39,16 @@ export default function RootLayout({
     children: React.ReactNode;
 }) {
     return (
-        <html lang="pt" suppressHydrationWarning>
+        <html lang="pt" suppressHydrationWarning data-scroll-behavior="smooth">
             <head>
                 {/* Preconnect to Google Fonts for faster loading */}
                 <link rel="preconnect" href="https://fonts.googleapis.com" />
                 <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
             </head>
-            <body className={`min-h-screen bg-background antialiased ${font.className} ${font.variable}`}>
+            <body
+                className={`min-h-screen bg-background antialiased ${font.className} ${font.variable}`}
+                suppressHydrationWarning
+            >
                 <Providers>
                     {children}
                 </Providers>

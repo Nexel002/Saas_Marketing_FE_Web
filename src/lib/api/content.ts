@@ -44,6 +44,8 @@ export interface MediaContentItem {
     thumbnail?: string;
     campaignName?: string;
     campaignId?: string;
+    /** Original Drive link for opening in new tab (used for videos) */
+    originalUrl?: string;
 }
 
 // =============================================
@@ -53,6 +55,9 @@ export interface MediaContentItem {
 /**
  * Convert Google Drive link to direct view URL
  * Handles various Drive URL formats and extracts file ID
+ * 
+ * Uses lh3.googleusercontent.com for images which bypasses CORS issues
+ * and provides reliable image embedding. For videos, uses Drive preview embed.
  * 
  * @param driveLink - Google Drive link (e.g., https://drive.google.com/file/d/FILE_ID/view)
  * @param type - Content type (IMAGE or VIDEO)
@@ -72,12 +77,18 @@ function convertDriveLinkToDirectUrl(driveLink: string, type: ContentType): stri
 
     // Format 2: https://drive.google.com/open?id=FILE_ID
     const match2 = driveLink.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-    if (match2) {
+    if (!fileId && match2) {
         fileId = match2[1];
     }
 
-    // Format 3: Already a direct link or file ID only
-    if (!fileId && driveLink.length > 20 && !driveLink.includes('/')) {
+    // Format 3: https://lh3.googleusercontent.com/d/FILE_ID - already converted
+    const match3 = driveLink.match(/lh3\.googleusercontent\.com\/d\/([a-zA-Z0-9_-]+)/);
+    if (!fileId && match3) {
+        fileId = match3[1];
+    }
+
+    // Format 4: Already a direct link or file ID only
+    if (!fileId && driveLink.length > 20 && !driveLink.includes('/') && !driveLink.includes('.')) {
         fileId = driveLink;
     }
 
@@ -87,13 +98,9 @@ function convertDriveLinkToDirectUrl(driveLink: string, type: ContentType): stri
     }
 
     // Convert to direct view URL based on type
-    if (type === 'IMAGE') {
-        // For images: use uc?export=view for direct image display
-        return `https://drive.google.com/uc?export=view&id=${fileId}`;
-    } else {
-        // For videos: use preview embed for proper video player
-        return `https://drive.google.com/file/d/${fileId}/preview`;
-    }
+    // For both images and videos, use lh3.googleusercontent.com as thumbnail
+    // This bypasses CORS and CSP issues with Google Drive
+    return `https://lh3.googleusercontent.com/d/${fileId}`;
 }
 
 // =============================================
@@ -134,14 +141,15 @@ export const contentService = {
                     });
                 } else {
                     // Single content item
+                    const isVideo = content.type === 'VIDEO';
                     mediaItems.push({
                         id: content.id,
-                        type: content.type === 'IMAGE' ? 'image' as const : 'video' as const,
+                        type: isVideo ? 'video' as const : 'image' as const,
+                        // For both types, use lh3 URL for display (as thumbnail for videos)
                         url: convertDriveLinkToDirectUrl(content.driveLink!, content.type),
                         title: content.name,
-                        thumbnail: content.type === 'VIDEO'
-                            ? convertDriveLinkToDirectUrl(content.driveLink!, 'IMAGE')
-                            : undefined,
+                        // For videos, store the original Drive link to open in new tab
+                        originalUrl: isVideo ? content.driveLink : undefined,
                         campaignName: content.campaignName,
                         campaignId: content.campaignId,
                     });

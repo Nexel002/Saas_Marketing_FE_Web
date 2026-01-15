@@ -66,12 +66,15 @@ export const campaignService = {
     /**
      * List campaigns for authenticated user
      * GET /api/v1/campaign
-     * Note: Backend extracts userId from JWT token
+     * @param userId - User ID (required by backend)
+     * @param objective - Optional filter by objective
      */
-    async list(objective?: CampaignObjective): Promise<ApiResponse<Campaign[]>> {
-        let url = '/campaign';
-        if (objective) url += `?objective=${objective}`;
-        return api.get<Campaign[]>(url);
+    async list(userId?: string, objective?: CampaignObjective): Promise<ApiResponse<Campaign[]>> {
+        const params = new URLSearchParams();
+        if (userId) params.append('userId', userId);
+        if (objective) params.append('objective', objective);
+        const query = params.toString();
+        return api.get<Campaign[]>(`/campaign${query ? `?${query}` : ''}`);
     },
 
     /**

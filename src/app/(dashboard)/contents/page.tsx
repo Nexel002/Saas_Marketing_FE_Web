@@ -39,6 +39,80 @@ if (typeof document !== 'undefined') {
     }
 }
 
+// =============================================
+// Lazy Image Component - Prevents Rate Limiting
+// =============================================
+
+interface LazyImageProps {
+    src: string;
+    alt: string;
+    className?: string;
+    index: number;
+    onError?: (e: React.SyntheticEvent<HTMLImageElement>) => void;
+}
+
+function LazyImage({ src, alt, className, index, onError }: LazyImageProps) {
+    const [isVisible, setIsVisible] = useState(false);
+    const [shouldLoad, setShouldLoad] = useState(false);
+    const [isLoaded, setIsLoaded] = useState(false);
+    const imgRef = useRef<HTMLDivElement>(null);
+
+    // Use IntersectionObserver to detect when image is in viewport
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (entry.isIntersecting) {
+                    setIsVisible(true);
+                    observer.disconnect();
+                }
+            },
+            { threshold: 0.1, rootMargin: '100px' }
+        );
+
+        if (imgRef.current) {
+            observer.observe(imgRef.current);
+        }
+
+        return () => observer.disconnect();
+    }, []);
+
+    // Staggered loading: add delay based on index to prevent rate limiting
+    useEffect(() => {
+        if (isVisible) {
+            // First 4 images load immediately, then stagger with 150ms delay per image
+            const delay = index < 4 ? 0 : (index - 4) * 150;
+            const timer = setTimeout(() => setShouldLoad(true), delay);
+            return () => clearTimeout(timer);
+        }
+    }, [isVisible, index]);
+
+    return (
+        <div ref={imgRef} className="relative">
+            {/* Loading skeleton */}
+            {!isLoaded && (
+                <div className="w-full aspect-square bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-pulse rounded-lg" />
+            )}
+
+            {/* Actual image - only loads when shouldLoad is true */}
+            {shouldLoad && (
+                <img
+                    src={src}
+                    alt={alt}
+                    className={`${className} ${isLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-500`}
+                    loading="lazy"
+                    referrerPolicy="no-referrer"
+                    onLoad={() => setIsLoaded(true)}
+                    onError={(e) => {
+                        setIsLoaded(true);
+                        onError?.(e);
+                    }}
+                    style={{ position: isLoaded ? 'relative' : 'absolute', top: 0, left: 0 }}
+                />
+            )}
+        </div>
+    );
+}
+
 type FilterType = 'ALL' | 'IMAGE' | 'VIDEO';
 
 export default function ContentsPage() {
@@ -251,8 +325,8 @@ export default function ContentsPage() {
                         <button
                             onClick={() => setSelectedType('ALL')}
                             className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${selectedType === 'ALL'
-                                    ? 'bg-white text-gray-900 shadow-md scale-105'
-                                    : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
+                                ? 'bg-white text-gray-900 shadow-md scale-105'
+                                : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
                                 }`}
                         >
                             Todos
@@ -260,8 +334,8 @@ export default function ContentsPage() {
                         <button
                             onClick={() => setSelectedType('IMAGE')}
                             className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${selectedType === 'IMAGE'
-                                    ? 'bg-white text-gray-900 shadow-md scale-105'
-                                    : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
+                                ? 'bg-white text-gray-900 shadow-md scale-105'
+                                : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
                                 }`}
                         >
                             🖼️ Imagens
@@ -269,8 +343,8 @@ export default function ContentsPage() {
                         <button
                             onClick={() => setSelectedType('VIDEO')}
                             className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${selectedType === 'VIDEO'
-                                    ? 'bg-white text-gray-900 shadow-md scale-105'
-                                    : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
+                                ? 'bg-white text-gray-900 shadow-md scale-105'
+                                : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
                                 }`}
                         >
                             🎬 Vídeos
@@ -305,6 +379,7 @@ export default function ContentsPage() {
                         >
                             <ContentCard
                                 item={item}
+                                index={index}
                                 onClick={() => handleCardClick(index)}
                             />
                         </div>
@@ -331,13 +406,11 @@ export default function ContentsPage() {
 
 interface ContentCardProps {
     item: MediaContentItem;
+    index: number;
     onClick: () => void;
 }
 
-function ContentCard({ item, onClick }: ContentCardProps) {
-    const [imageLoaded, setImageLoaded] = useState(false);
-    const [imageError, setImageError] = useState(false);
-
+function ContentCard({ item, index, onClick }: ContentCardProps) {
     const handleDownload = async (e: React.MouseEvent) => {
         e.stopPropagation();
         try {
@@ -352,7 +425,7 @@ function ContentCard({ item, onClick }: ContentCardProps) {
             document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
         } catch (error) {
-            window.open(item.url, '_blank');
+            window.open(item.originalUrl || item.url, '_blank');
         }
     };
 
@@ -362,106 +435,100 @@ function ContentCard({ item, onClick }: ContentCardProps) {
             try {
                 await navigator.share({
                     title: item.title,
-                    url: item.url,
+                    url: item.originalUrl || item.url,
                 });
             } catch (err) {
-                navigator.clipboard.writeText(item.url);
+                navigator.clipboard.writeText(item.originalUrl || item.url);
             }
         } else {
-            navigator.clipboard.writeText(item.url);
+            navigator.clipboard.writeText(item.originalUrl || item.url);
+        }
+    };
+
+    const handleClick = () => {
+        // For videos, open in Google Drive directly to avoid CSP issues
+        if (item.type === 'video' && item.originalUrl) {
+            window.open(item.originalUrl, '_blank', 'noopener,noreferrer');
+        } else {
+            onClick();
         }
     };
 
     return (
         <div
-            className="content-card group relative rounded-2xl overflow-hidden cursor-pointer break-inside-avoid bg-white shadow-sm hover:shadow-2xl opacity-0 transition-all duration-500 ease-out"
-            onClick={onClick}
+            className="gallery-card relative rounded-xl overflow-hidden cursor-pointer group break-inside-avoid mb-4 bg-gray-100"
+            onClick={handleClick}
             style={{
-                transform: 'translateY(20px)',
-                animation: 'fadeInUp 0.6s ease-out forwards',
+                animation: 'fadeInUp 0.5s ease-out forwards',
             }}
         >
             {/* Thumbnail */}
-            <div className="relative overflow-hidden">
-                {item.type === 'image' ? (
-                    <>
-                        {/* Loading skeleton */}
-                        {!imageLoaded && !imageError && (
-                            <div className="w-full h-64 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 animate-pulse" />
-                        )}
-
-                        {/* Error state */}
-                        {imageError && (
-                            <div className="w-full h-64 bg-gray-100 flex items-center justify-center">
-                                <div className="text-center text-gray-400">
-                                    <span className="text-4xl mb-2 block">🖼️</span>
-                                    <p className="text-sm">Imagem não disponível</p>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Actual image */}
-                        <img
-                            src={item.url}
-                            alt={item.title}
-                            className={`w-full h-auto object-cover transition-all duration-700 ${imageLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
-                                } group-hover:scale-110`}
-                            loading="lazy"
-                            onLoad={() => setImageLoaded(true)}
-                            onError={() => setImageError(true)}
-                            style={{ display: imageError ? 'none' : 'block' }}
-                        />
-                    </>
-                ) : (
-                    <div className="relative bg-gray-900">
-                        <iframe
-                            src={item.url}
-                            className="w-full h-64 object-cover pointer-events-none"
-                            allow="autoplay"
-                            title={item.title}
-                        />
-
-                        {/* Video overlay */}
-                        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors duration-300" />
-
-                        {/* Play Button */}
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <div className="w-16 h-16 bg-white/95 backdrop-blur-sm rounded-full flex items-center justify-center shadow-2xl transform group-hover:scale-110 transition-transform duration-300">
-                                <PlayIcon className="w-8 h-8 text-gray-800 ml-1" />
-                            </div>
-                        </div>
-
-                        {/* Video Badge */}
-                        <div className="absolute bottom-3 right-3 px-3 py-1.5 bg-black/80 backdrop-blur-sm rounded-lg text-white text-xs font-semibold flex items-center gap-1">
-                            <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
-                            Vídeo
+            {item.type === 'image' ? (
+                <LazyImage
+                    src={item.url}
+                    alt={item.title}
+                    index={index}
+                    className="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105"
+                    onError={(e) => {
+                        const target = e.currentTarget;
+                        target.style.display = 'none';
+                        const parent = target.parentElement;
+                        if (parent && !parent.querySelector('.error-state')) {
+                            const errorDiv = document.createElement('div');
+                            errorDiv.className = 'error-state w-full aspect-square bg-gray-200 flex items-center justify-center';
+                            errorDiv.innerHTML = '<div class="text-center text-gray-400"><span class="text-4xl block mb-2">🖼️</span><p class="text-sm">Imagem não disponível</p></div>';
+                            parent.appendChild(errorDiv);
+                        }
+                    }}
+                />
+            ) : (
+                <div className="relative">
+                    {/* Video uses same lh3 thumbnail URL */}
+                    <LazyImage
+                        src={item.url}
+                        alt={item.title}
+                        index={index}
+                        className="w-full h-auto object-cover"
+                        onError={(e) => {
+                            const target = e.currentTarget;
+                            target.style.display = 'none';
+                            const parent = target.parentElement;
+                            if (parent && !parent.querySelector('.error-state')) {
+                                const errorDiv = document.createElement('div');
+                                errorDiv.className = 'error-state w-full aspect-video bg-gray-800 flex items-center justify-center';
+                                errorDiv.innerHTML = '<div class="text-center text-gray-400"><span class="text-4xl block mb-2">🎬</span><p class="text-sm">Clique para ver vídeo</p></div>';
+                                parent.appendChild(errorDiv);
+                            }
+                        }}
+                    />
+                    {/* Play Button Overlay */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-12 h-12 bg-white/90 rounded-full flex items-center justify-center shadow-lg">
+                            <PlayIcon className="w-6 h-6 text-gray-800 ml-0.5" />
                         </div>
                     </div>
-                )}
-            </div>
-
-            {/* Gradient Overlay on Hover */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-
-            {/* Campaign Badge */}
-            {item.campaignName && (
-                <div className="absolute top-3 left-3 px-3 py-1.5 bg-white/95 backdrop-blur-sm text-gray-800 text-xs font-bold rounded-full shadow-lg opacity-0 group-hover:opacity-100 transform -translate-y-2 group-hover:translate-y-0 transition-all duration-300">
-                    {item.campaignName}
+                    {/* Video Badge */}
+                    <div className="absolute bottom-2 right-2 px-2 py-0.5 bg-black/70 rounded text-white text-xs font-medium">
+                        Vídeo
+                    </div>
                 </div>
             )}
 
+            {/* Hover Overlay */}
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-300" />
+
             {/* Action Buttons */}
-            <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transform translate-x-4 group-hover:translate-x-0 transition-all duration-300">
+            <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                 <button
                     onClick={handleDownload}
-                    className="p-2.5 bg-white/95 backdrop-blur-sm rounded-full shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-110 active:scale-95"
+                    className="p-2 bg-white rounded-full shadow-lg transition-transform hover:scale-110"
                     title="Baixar"
                 >
                     <DownloadIcon className="w-4 h-4 text-gray-700" />
                 </button>
                 <button
                     onClick={handleShare}
-                    className="p-2.5 bg-white/95 backdrop-blur-sm rounded-full shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-110 active:scale-95"
+                    className="p-2 bg-white rounded-full shadow-lg transition-transform hover:scale-110"
                     title="Partilhar"
                 >
                     <ShareIcon className="w-4 h-4 text-gray-700" />
@@ -469,22 +536,17 @@ function ContentCard({ item, onClick }: ContentCardProps) {
             </div>
 
             {/* Title Overlay */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all duration-300">
-                <p className="text-white text-sm font-semibold truncate drop-shadow-lg">
-                    {item.title}
-                </p>
+            <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <p className="text-white text-sm font-medium truncate">{item.title}</p>
             </div>
 
-            {/* Pinterest-style Save Button */}
+            {/* Save Button (Pinterest style) */}
             <button
                 onClick={handleDownload}
-                className="absolute top-3 left-3 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-full opacity-0 group-hover:opacity-100 transform -translate-y-2 group-hover:translate-y-0 transition-all duration-300 shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95"
+                className="absolute top-2 left-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-lg"
             >
                 Salvar
             </button>
-
-            {/* Subtle border glow on hover */}
-            <div className="absolute inset-0 rounded-2xl border-2 border-transparent group-hover:border-primary/20 transition-colors duration-300 pointer-events-none" />
         </div>
     );
 }

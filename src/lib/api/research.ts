@@ -33,10 +33,11 @@ export const researchService = {
     /**
      * List market research for authenticated user
      * GET /api/v1/research
-     * Note: Backend extracts userId from JWT token
+     * @param userId - User ID (required by backend)
      */
-    async list(): Promise<ApiResponse<MarketResearch[]>> {
-        return api.get<MarketResearch[]>('/research');
+    async list(userId?: string): Promise<ApiResponse<MarketResearch[]>> {
+        const params = userId ? `?userId=${userId}` : '';
+        return api.get<MarketResearch[]>(`/research${params}`);
     },
 
     /**

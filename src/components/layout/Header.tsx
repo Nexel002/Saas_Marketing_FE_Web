@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
  * Header Component
  * 
  * Top navigation bar for the dashboard.
- * Contains hamburger menu, page title, and user menu.
+ * Contains hamburger menu, page title, notifications, and user menu.
  */
 
 // =============================================
@@ -29,6 +29,54 @@ interface HeaderProps {
     };
 }
 
+interface NotificationItem {
+    id: string;
+    title: string;
+    message: string;
+    type: 'info' | 'success' | 'warning' | 'campaign';
+    time: string;
+    read: boolean;
+}
+
+// =============================================
+// Mock Notifications (replace with real data later)
+// =============================================
+
+const mockNotifications: NotificationItem[] = [
+    {
+        id: '1',
+        title: 'Campanha criada com sucesso',
+        message: 'A sua campanha "Promoção de Verão" foi criada e está pronta para gerar conteúdos.',
+        type: 'success',
+        time: '2 min atrás',
+        read: false
+    },
+    {
+        id: '2',
+        title: 'Novos conteúdos gerados',
+        message: '5 novas imagens e 2 vídeos foram gerados para a campanha "Flores Premium".',
+        type: 'campaign',
+        time: '15 min atrás',
+        read: false
+    },
+    {
+        id: '3',
+        title: 'Pesquisa de mercado concluída',
+        message: 'A análise de mercado para o seu negócio foi concluída. Clique para ver os resultados.',
+        type: 'info',
+        time: '1 hora atrás',
+        read: true
+    },
+    {
+        id: '4',
+        title: 'Plano estratégico pronto',
+        message: 'O plano estratégico para "EGNA Flores" está disponível para visualização.',
+        type: 'success',
+        time: '2 horas atrás',
+        read: true
+    }
+];
+
 // =============================================
 // Component
 // =============================================
@@ -37,11 +85,57 @@ export function Header({ title, onMenuClick, user }: HeaderProps) {
     const router = useRouter();
     const { logout } = useAuth();
     const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+    const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+    const [notifications, setNotifications] = useState<NotificationItem[]>(mockNotifications);
+
+    const unreadCount = notifications.filter(n => !n.read).length;
+
+    // Close dropdowns when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            if (!target.closest('[data-notification-dropdown]')) {
+                setIsNotificationsOpen(false);
+            }
+        };
+
+        if (isNotificationsOpen) {
+            document.addEventListener('click', handleClickOutside);
+            return () => document.removeEventListener('click', handleClickOutside);
+        }
+    }, [isNotificationsOpen]);
 
     const handleLogout = async () => {
         setIsUserMenuOpen(false);
         await logout();
         router.push('/login');
+    };
+
+    const markAsRead = (id: string) => {
+        setNotifications(prev =>
+            prev.map(n => n.id === id ? { ...n, read: true } : n)
+        );
+    };
+
+    const markAllAsRead = () => {
+        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    };
+
+    const dismissNotification = (id: string) => {
+        setNotifications(prev => prev.filter(n => n.id !== id));
+    };
+
+    const getNotificationIcon = (type: NotificationItem['type']) => {
+        switch (type) {
+            case 'success':
+                return <div className="p-2 rounded-lg bg-green-50"><CheckIcon className="w-4 h-4 text-green-500" /></div>;
+            case 'warning':
+                return <div className="p-2 rounded-lg bg-amber-50"><WarningIcon className="w-4 h-4 text-amber-500" /></div>;
+            case 'campaign':
+                return <div className="p-2 rounded-lg bg-pink-50"><CampaignIcon className="w-4 h-4 text-pink-500" /></div>;
+            default:
+                return <div className="p-2 rounded-lg bg-blue-50"><InfoIcon className="w-4 h-4 text-blue-500" /></div>;
+        }
     };
 
     return (
@@ -68,20 +162,144 @@ export function Header({ title, onMenuClick, user }: HeaderProps) {
 
                 {/* Right side */}
                 <div className="flex items-center gap-3">
-                    {/* Notifications (placeholder) */}
-                    <button
-                        className="p-2 rounded-lg hover:bg-surface transition-colors relative"
-                        aria-label="Notificações"
-                    >
-                        <BellIcon className="w-5 h-5 text-text-secondary" />
-                        {/* Notification badge */}
-                        <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-error rounded-full" />
-                    </button>
+                    {/* Notifications */}
+                    <div className="relative" data-notification-dropdown>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setIsNotificationsOpen(!isNotificationsOpen);
+                                setIsUserMenuOpen(false);
+                            }}
+                            className="p-2 rounded-lg hover:bg-surface transition-all duration-200 relative group"
+                            aria-label="Notificações"
+                        >
+                            <BellIcon className={`w-5 h-5 transition-colors duration-200 ${isNotificationsOpen ? 'text-primary' : 'text-text-secondary group-hover:text-text-primary'}`} />
+
+                            {/* Notification badge with pulse animation */}
+                            {unreadCount > 0 && (
+                                <span className="absolute top-1 right-1 flex h-4 w-4">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-4 w-4 bg-error items-center justify-center text-[10px] font-bold text-white">
+                                        {unreadCount}
+                                    </span>
+                                </span>
+                            )}
+                        </button>
+
+                        {/* Notifications Dropdown */}
+                        {isNotificationsOpen && (
+                            <>
+                                {/* Backdrop */}
+                                <div
+                                    className="fixed inset-0 z-10"
+                                    onClick={() => setIsNotificationsOpen(false)}
+                                />
+
+                                {/* Dropdown Panel */}
+                                <div
+                                    className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-xl border border-gray-100 z-20 overflow-hidden"
+                                    style={{
+                                        animation: 'slideDown 0.25s ease-out forwards',
+                                    }}
+                                >
+                                    {/* Header */}
+                                    <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+                                        <div className="flex items-center gap-2">
+                                            <BellIcon className="w-5 h-5 text-gray-600" />
+                                            <h3 className="font-semibold text-gray-800">Notificações</h3>
+                                            {unreadCount > 0 && (
+                                                <span className="px-2 py-0.5 text-xs font-medium bg-primary text-white rounded-full">
+                                                    {unreadCount} novas
+                                                </span>
+                                            )}
+                                        </div>
+                                        {unreadCount > 0 && (
+                                            <button
+                                                onClick={markAllAsRead}
+                                                className="text-xs text-primary hover:text-primary/80 font-medium transition-colors"
+                                            >
+                                                Marcar todas como lidas
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Notifications List */}
+                                    <div className="max-h-[400px] overflow-y-auto">
+                                        {notifications.length === 0 ? (
+                                            <div className="p-8 text-center">
+                                                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                                    <BellIcon className="w-6 h-6 text-gray-400" />
+                                                </div>
+                                                <p className="text-sm text-gray-500">Nenhuma notificação</p>
+                                            </div>
+                                        ) : (
+                                            <div className="divide-y divide-gray-50">
+                                                {notifications.map((notification, index) => (
+                                                    <div
+                                                        key={notification.id}
+                                                        onClick={() => markAsRead(notification.id)}
+                                                        className={`p-4 hover:bg-gray-50 cursor-pointer transition-all duration-200 ${!notification.read ? 'bg-primary/5 border-l-2 border-l-primary' : ''
+                                                            }`}
+                                                        style={{
+                                                            animation: `fadeSlideIn 0.3s ease-out forwards`,
+                                                            animationDelay: `${index * 50}ms`,
+                                                            opacity: 0,
+                                                        }}
+                                                    >
+                                                        <div className="flex items-start gap-3">
+                                                            {getNotificationIcon(notification.type)}
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className={`text-sm font-medium truncate ${!notification.read ? 'text-gray-900' : 'text-gray-700'}`}>
+                                                                    {notification.title}
+                                                                </p>
+                                                                <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
+                                                                    {notification.message}
+                                                                </p>
+                                                                <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1">
+                                                                    <ClockIcon className="w-3 h-3" />
+                                                                    {notification.time}
+                                                                </p>
+                                                            </div>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    dismissNotification(notification.id);
+                                                                }}
+                                                                className="p-1 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors opacity-0 group-hover:opacity-100"
+                                                            >
+                                                                <CloseIcon className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Footer */}
+                                    {notifications.length > 0 && (
+                                        <div className="p-3 border-t border-gray-100 bg-gray-50">
+                                            <Link
+                                                href="/notifications"
+                                                className="block text-center text-sm text-primary hover:text-primary/80 font-medium transition-colors"
+                                                onClick={() => setIsNotificationsOpen(false)}
+                                            >
+                                                Ver todas as notificações
+                                            </Link>
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        )}
+                    </div>
 
                     {/* User menu */}
                     <div className="relative">
                         <button
-                            onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                            onClick={() => {
+                                setIsUserMenuOpen(!isUserMenuOpen);
+                                setIsNotificationsOpen(false);
+                            }}
                             className="flex items-center gap-3 p-2 rounded-xl hover:bg-surface transition-colors"
                         >
                             {/* Avatar */}
@@ -117,7 +335,12 @@ export function Header({ title, onMenuClick, user }: HeaderProps) {
                                 />
 
                                 {/* Menu */}
-                                <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-card border border-border py-2 z-20 animate-fade-in">
+                                <div
+                                    className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-card border border-border py-2 z-20"
+                                    style={{
+                                        animation: 'slideDown 0.2s ease-out forwards',
+                                    }}
+                                >
                                     {/* User info */}
                                     <div className="px-4 py-2 border-b border-border mb-2">
                                         <p className="font-medium text-text-primary">{user?.name}</p>
@@ -158,6 +381,30 @@ export function Header({ title, onMenuClick, user }: HeaderProps) {
                     </div>
                 </div>
             </div>
+
+            {/* Animation Keyframes */}
+            <style jsx>{`
+                @keyframes slideDown {
+                    from {
+                        opacity: 0;
+                        transform: translateY(-10px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+                @keyframes fadeSlideIn {
+                    from {
+                        opacity: 0;
+                        transform: translateX(-10px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateX(0);
+                    }
+                }
+            `}</style>
         </header>
     );
 }
@@ -211,6 +458,54 @@ function LogoutIcon({ className }: { className?: string }) {
     return (
         <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+        </svg>
+    );
+}
+
+function CheckIcon({ className }: { className?: string }) {
+    return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
+    );
+}
+
+function WarningIcon({ className }: { className?: string }) {
+    return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+    );
+}
+
+function CampaignIcon({ className }: { className?: string }) {
+    return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+        </svg>
+    );
+}
+
+function InfoIcon({ className }: { className?: string }) {
+    return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+    );
+}
+
+function ClockIcon({ className }: { className?: string }) {
+    return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+    );
+}
+
+function CloseIcon({ className }: { className?: string }) {
+    return (
+        <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
         </svg>
     );
 }
