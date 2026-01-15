@@ -2,6 +2,13 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Providers } from '@/components/Providers';
 
+import { Plus_Jakarta_Sans } from 'next/font/google';
+
+const font = Plus_Jakarta_Sans({
+    subsets: ['latin'],
+    variable: '--font-sans',
+});
+
 /**
  * Metadata for the application
  * SEO optimized with proper descriptions
@@ -38,7 +45,7 @@ export default function RootLayout({
                 <link rel="preconnect" href="https://fonts.googleapis.com" />
                 <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
             </head>
-            <body className="min-h-screen bg-background antialiased">
+            <body className={`min-h-screen bg-background antialiased ${font.className} ${font.variable}`}>
                 <Providers>
                     {children}
                 </Providers>

@@ -223,6 +223,7 @@ function PreviewModal({ item, onClose }: PreviewModalProps) {
                             controls
                             loop
                             playsInline
+                            autoPlay
                         />
                     </div>
                 )}

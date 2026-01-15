@@ -25,6 +25,8 @@ O PromoMo é uma plataforma SaaS que utiliza Inteligência Artificial para ajuda
 - 📋 **Plano Estratégico** - Identidade visual e branding
 - 🎯 **Campanhas** - Criação e gestão de campanhas de marketing
 - 🏢 **Perfil do Negócio** - Gestão de informações empresariais
+- 📸 **Product Assets** - Upload de imagens e vídeos para uso em conteúdos
+- 🎥 **Video Player** - Renderização automática de vídeos estilo Pinterest
 
 ## 🛠️ Stack Tecnológico
 

@@ -183,6 +183,29 @@ class ApiClient {
 
         return this.handleResponse<T>(response);
     }
+
+    /**
+     * POST request with FormData (for file uploads)
+     * Does not set Content-Type header - browser sets it automatically with correct boundary
+     */
+    async postFormData<T>(endpoint: string, formData: FormData, options?: RequestOptions): Promise<ApiResponse<T>> {
+        const url = this.buildUrl(endpoint, options?.params);
+
+        const headers: HeadersInit = {};
+        const token = getToken();
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers,
+            body: formData,
+            ...options,
+        });
+
+        return this.handleResponse<T>(response);
+    }
 }
 
 // =============================================
