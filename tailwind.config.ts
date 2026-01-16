@@ -9,7 +9,7 @@ const config: Config = {
     theme: {
         extend: {
             // =============================================
-            // DESIGN TOKENS - PromoMo Light Theme
+            // DESIGN TOKENS - Godin Light Theme
             // =============================================
             colors: {
                 // Background colors

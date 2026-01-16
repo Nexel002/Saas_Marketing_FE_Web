@@ -23,7 +23,7 @@ const nextConfig = {
 
     // Environment variables that should be available client-side
     env: {
-        NEXT_PUBLIC_APP_NAME: 'PromoMo',
+        NEXT_PUBLIC_APP_NAME: 'Godin',
     },
 };
 

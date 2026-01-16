@@ -13,7 +13,7 @@ export default function HomePage() {
                     {/* Logo / Brand */}
                     <div className="mb-8">
                         <h1 className="text-5xl md:text-6xl font-bold text-text-primary mb-4">
-                            Promo<span className="text-primary">Mo</span>
+                            Godin
                         </h1>
                         <p className="text-xl md:text-2xl text-text-secondary max-w-2xl mx-auto">
                             Automação de Marketing com IA para o seu Negócio
@@ -65,7 +65,7 @@ export default function HomePage() {
 
             {/* Footer */}
             <footer className="py-6 text-center text-text-muted bg-surface">
-                <p>© 2024 PromoMo. Desenvolvido com ❤️ pela NexelIT</p>
+                <p>© 2024 Godin. Desenvolvido com ❤️ pela NexelIT</p>
             </footer>
         </main>
     );

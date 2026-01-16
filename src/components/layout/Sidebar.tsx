@@ -154,7 +154,7 @@ export function Sidebar({ isOpen = true, onClose, isCollapsed = false, onToggleC
                         {!isCollapsed && (
                             <Link href="/dashboard" className="flex items-center gap-2">
                                 <span className="text-xl font-bold text-gray-800">
-                                    Promo<span className="text-primary">Mo</span>
+                                    Godin
                                 </span>
                             </Link>
                         )}

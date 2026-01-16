@@ -38,7 +38,7 @@ interface RequestOptions extends RequestInit {
 // Token Management
 // =============================================
 
-const TOKEN_KEY = 'promomo_token';
+const TOKEN_KEY = 'godin_token';
 
 export const getToken = (): string | null => {
     if (typeof window === 'undefined') return null;

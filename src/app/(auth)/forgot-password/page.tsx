@@ -40,7 +40,7 @@ export default function ForgotPasswordPage() {
             <div className="hidden lg:flex lg:w-1/2 bg-gradient-pastel items-center justify-center p-12">
                 <div className="max-w-md text-center">
                     <h1 className="text-5xl font-bold text-text-primary mb-4">
-                        Promo<span className="text-primary">Mo</span>
+                        Godin
                     </h1>
                     <p className="text-xl text-text-secondary mb-8">
                         Automação de Marketing com IA para o seu Negócio
@@ -62,7 +62,7 @@ export default function ForgotPasswordPage() {
                     {/* Mobile logo */}
                     <div className="lg:hidden text-center mb-8">
                         <h1 className="text-3xl font-bold text-text-primary">
-                            Promo<span className="text-primary">Mo</span>
+                            Godin
                         </h1>
                     </div>
 
@@ -206,7 +206,7 @@ export default function ForgotPasswordPage() {
 
                     {/* Footer */}
                     <p className="text-center text-xs text-text-muted mt-6">
-                        © 2024 PromoMo. Desenvolvido pela NexelIT
+                        © 2024 Godin. Desenvolvido pela NexelIT
                     </p>
                 </div>
             </div>

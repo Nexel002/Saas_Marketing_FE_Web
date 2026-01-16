@@ -727,7 +727,7 @@ export default function ChatPage() {
                         </div>
 
                         <p className="text-xs text-gray-400 text-center mt-2">
-                            PromoMo usa IA para gerar respostas. Verifique informações importantes.
+                            Godin usa IA para gerar respostas. Verifique informações importantes.
                         </p>
                     </div>
                 </div>

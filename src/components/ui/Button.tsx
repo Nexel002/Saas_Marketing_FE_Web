@@ -4,7 +4,7 @@ import { ButtonHTMLAttributes, forwardRef } from 'react';
  * Button Component
  * 
  * A versatile button component with multiple variants and sizes.
- * Follows the PromoMo design system with primary, secondary, outline, and ghost variants.
+ * Follows the Godin design system with primary, secondary, outline, and ghost variants.
  * 
  * @example
  * <Button variant="primary" size="md">Click me</Button>
@@ -16,18 +16,18 @@ import { ButtonHTMLAttributes, forwardRef } from 'react';
 // =============================================
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-    /** Visual variant of the button */
-    variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
-    /** Size of the button */
-    size?: 'sm' | 'md' | 'lg';
-    /** Whether the button is in a loading state */
-    isLoading?: boolean;
-    /** Full width button */
-    fullWidth?: boolean;
-    /** Left icon element */
-    leftIcon?: React.ReactNode;
-    /** Right icon element */
-    rightIcon?: React.ReactNode;
+  /** Visual variant of the button */
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
+  /** Size of the button */
+  size?: 'sm' | 'md' | 'lg';
+  /** Whether the button is in a loading state */
+  isLoading?: boolean;
+  /** Full width button */
+  fullWidth?: boolean;
+  /** Left icon element */
+  leftIcon?: React.ReactNode;
+  /** Right icon element */
+  rightIcon?: React.ReactNode;
 }
 
 // =============================================
@@ -43,35 +43,35 @@ const baseStyles = `
 `;
 
 const variantStyles = {
-    primary: `
+  primary: `
     bg-primary text-white
     hover:bg-primary-600 active:bg-primary-700
     shadow-soft hover:shadow-md
   `,
-    secondary: `
+  secondary: `
     bg-surface text-text-primary
     hover:bg-gray-100 active:bg-gray-200
     border border-border
   `,
-    outline: `
+  outline: `
     bg-transparent text-primary
     border-2 border-primary
     hover:bg-primary hover:text-white
   `,
-    ghost: `
+  ghost: `
     bg-transparent text-text-secondary
     hover:bg-surface hover:text-text-primary
   `,
-    danger: `
+  danger: `
     bg-error text-white
     hover:bg-red-600 active:bg-red-700
   `,
 };
 
 const sizeStyles = {
-    sm: 'px-3 py-1.5 text-sm gap-1.5',
-    md: 'px-5 py-2.5 text-base gap-2',
-    lg: 'px-7 py-3.5 text-lg gap-2.5',
+  sm: 'px-3 py-1.5 text-sm gap-1.5',
+  md: 'px-5 py-2.5 text-base gap-2',
+  lg: 'px-7 py-3.5 text-lg gap-2.5',
 };
 
 // =============================================
@@ -79,22 +79,22 @@ const sizeStyles = {
 // =============================================
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-    (
-        {
-            variant = 'primary',
-            size = 'md',
-            isLoading = false,
-            fullWidth = false,
-            leftIcon,
-            rightIcon,
-            className = '',
-            disabled,
-            children,
-            ...props
-        },
-        ref
-    ) => {
-        const classes = `
+  (
+    {
+      variant = 'primary',
+      size = 'md',
+      isLoading = false,
+      fullWidth = false,
+      leftIcon,
+      rightIcon,
+      className = '',
+      disabled,
+      children,
+      ...props
+    },
+    ref
+  ) => {
+    const classes = `
       ${baseStyles}
       ${variantStyles[variant]}
       ${sizeStyles[size]}
@@ -102,33 +102,33 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       ${className}
     `.trim().replace(/\s+/g, ' ');
 
-        return (
-            <button
-                ref={ref}
-                className={classes}
-                disabled={disabled || isLoading}
-                {...props}
-            >
-                {/* Loading spinner */}
-                {isLoading && (
-                    <span className="spinner mr-2" />
-                )}
+    return (
+      <button
+        ref={ref}
+        className={classes}
+        disabled={disabled || isLoading}
+        {...props}
+      >
+        {/* Loading spinner */}
+        {isLoading && (
+          <span className="spinner mr-2" />
+        )}
 
-                {/* Left icon */}
-                {!isLoading && leftIcon && (
-                    <span className="flex-shrink-0">{leftIcon}</span>
-                )}
+        {/* Left icon */}
+        {!isLoading && leftIcon && (
+          <span className="flex-shrink-0">{leftIcon}</span>
+        )}
 
-                {/* Button text */}
-                <span>{children}</span>
+        {/* Button text */}
+        <span>{children}</span>
 
-                {/* Right icon */}
-                {rightIcon && (
-                    <span className="flex-shrink-0">{rightIcon}</span>
-                )}
-            </button>
-        );
-    }
+        {/* Right icon */}
+        {rightIcon && (
+          <span className="flex-shrink-0">{rightIcon}</span>
+        )}
+      </button>
+    );
+  }
 );
 
 Button.displayName = 'Button';

@@ -50,14 +50,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 try {
                     // Token exists, try to get user info
                     // For now, we'll store user in localStorage too
-                    const storedUser = localStorage.getItem('promomo_user');
+                    const storedUser = localStorage.getItem('godin_user');
                     if (storedUser) {
                         setUser(JSON.parse(storedUser));
                     }
                 } catch (error) {
                     // Token is invalid, clear it
                     removeToken();
-                    localStorage.removeItem('promomo_user');
+                    localStorage.removeItem('godin_user');
                 }
             }
 
@@ -71,14 +71,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const login = async (email: string, password: string) => {
         const response = await authService.login({ email, password });
         setUser(response.user);
-        localStorage.setItem('promomo_user', JSON.stringify(response.user));
+        localStorage.setItem('godin_user', JSON.stringify(response.user));
     };
 
     // Register handler
     const register = async (nome: string, email: string, password: string) => {
         const response = await authService.register({ nome, email, password });
         setUser(response.user);
-        localStorage.setItem('promomo_user', JSON.stringify(response.user));
+        localStorage.setItem('godin_user', JSON.stringify(response.user));
     };
 
     // Logout handler
@@ -87,7 +87,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             await authService.logout();
         } finally {
             setUser(null);
-            localStorage.removeItem('promomo_user');
+            localStorage.removeItem('godin_user');
         }
     };
 

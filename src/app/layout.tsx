@@ -15,17 +15,17 @@ const font = Plus_Jakarta_Sans({
  */
 export const metadata: Metadata = {
     title: {
-        default: 'PromoMo - Marketing Automation',
-        template: '%s | PromoMo',
+        default: 'Godin - Marketing Automation',
+        template: '%s | Godin',
     },
     description: 'Plataforma de automação de marketing digital com IA para pequenos negócios em Moçambique',
-    keywords: ['marketing', 'automação', 'IA', 'negócios', 'Moçambique', 'PromoMo'],
+    keywords: ['marketing', 'automação', 'IA', 'negócios', 'Moçambique', 'Godin'],
     authors: [{ name: 'NexelIT' }],
     creator: 'NexelIT',
     openGraph: {
         type: 'website',
         locale: 'pt_MZ',
-        siteName: 'PromoMo',
+        siteName: 'Godin',
     },
 };
 

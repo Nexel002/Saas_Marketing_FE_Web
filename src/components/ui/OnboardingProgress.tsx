@@ -64,7 +64,7 @@ export function OnboardingProgress({
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                     <span className="text-lg">🚀</span>
-                    <h3 className="font-semibold text-gray-800">Configure seu PromoMo</h3>
+                    <h3 className="font-semibold text-gray-800">Configure seu Godin</h3>
                 </div>
                 <span className="text-sm font-medium text-primary">{progressPercent}%</span>
             </div>

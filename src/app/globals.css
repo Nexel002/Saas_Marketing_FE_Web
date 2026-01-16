@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* =============================================
-   PromoMo - Global Styles
+   Godin - Global Styles
    Light theme with pastel gradients
    ============================================= */
 
@@ -203,12 +203,30 @@ body {
  * ============================================= */
 
 @keyframes wave {
-  0%, 100% { height: 40%; }
-  50% { height: 100%; }
+
+  0%,
+  100% {
+    height: 40%;
+  }
+
+  50% {
+    height: 100%;
+  }
 }
 
 @keyframes pulse-ring {
-  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-  70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+  }
+
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
 }

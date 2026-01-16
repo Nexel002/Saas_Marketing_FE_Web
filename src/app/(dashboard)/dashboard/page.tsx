@@ -213,7 +213,7 @@ function generateNotifications(data: DashboardSummary): NotificationItem[] {
     if (!data.hasBusiness) {
         notifications.push({
             id: 'welcome',
-            title: 'Bem-vindo ao PromoMo! 🎉',
+            title: 'Bem-vindo ao Godin! 🎉',
             message: 'Configure seu negócio para começar a usar a plataforma.',
             type: 'info',
             timestamp: now.toISOString(),

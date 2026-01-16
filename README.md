@@ -1,6 +1,6 @@
-# PromoMo Frontend 🚀
+# Godin Frontend 🚀
 
-Frontend Web do PromoMo - Plataforma de Automação de Marketing com IA para pequenos negócios em Moçambique.
+Frontend Web do Godin - Plataforma de Automação de Marketing com IA para pequenos negócios em Moçambique.
 
 ## 📋 Índice
 

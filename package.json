@@ -1,8 +1,8 @@
 {
-  "name": "promomo-frontend",
+  "name": "godin-fe",
   "version": "1.0.0",
   "private": true,
-  "description": "PromoMo - Marketing Automation Frontend",
+  "description": "Godin - Marketing Automation Frontend",
   "author": "NexelIT",
   "scripts": {
     "dev": "next dev",

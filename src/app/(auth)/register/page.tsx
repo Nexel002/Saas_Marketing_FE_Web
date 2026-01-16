@@ -62,7 +62,7 @@ export default function RegisterPage() {
             <div className="hidden lg:flex lg:w-1/2 bg-gradient-pastel items-center justify-center p-12">
                 <div className="max-w-md text-center">
                     <h1 className="text-5xl font-bold text-text-primary mb-4">
-                        Promo<span className="text-primary">Mo</span>
+                        Godin
                     </h1>
                     <p className="text-xl text-text-secondary mb-8">
                         Comece a automatizar o seu marketing hoje
@@ -100,7 +100,7 @@ export default function RegisterPage() {
                     {/* Mobile logo */}
                     <div className="lg:hidden text-center mb-8">
                         <h1 className="text-3xl font-bold text-text-primary">
-                            Promo<span className="text-primary">Mo</span>
+                            Godin
                         </h1>
                     </div>
 
@@ -111,7 +111,7 @@ export default function RegisterPage() {
                                 Criar Conta
                             </h2>
                             <p className="text-text-secondary mt-2">
-                                Registe-se para começar a usar o PromoMo
+                                Registe-se para começar a usar o Godin
                             </p>
                         </div>
 
@@ -199,7 +199,7 @@ export default function RegisterPage() {
 
                     {/* Footer */}
                     <p className="text-center text-xs text-text-muted mt-6">
-                        © 2024 PromoMo. Desenvolvido pela NexelIT
+                        © 2024 Godin. Desenvolvido pela NexelIT
                     </p>
                 </div>
             </div>
